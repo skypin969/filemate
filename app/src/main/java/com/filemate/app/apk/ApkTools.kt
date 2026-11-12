@@ -91,8 +91,8 @@ object ApkTools {
 
         output.parentFile?.mkdirs()
         ApkSigner.Builder(listOf(signer))
-            .setInputApkFile(input)
-            .setOutputApkFile(output)
+            .setInputApk(input)
+            .setOutputApk(output)
             .setV1SigningEnabled(true)
             .setV2SigningEnabled(true)
             .setV3SigningEnabled(true)
