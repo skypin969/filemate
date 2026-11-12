@@ -128,7 +128,7 @@ fun ConfirmDialog(
             ) {
                 Text(
                     text = confirmText,
-                    color = if (danger) Danger else Blue700,
+                    color = if (danger) Danger else Accent,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -163,7 +163,7 @@ fun ApkDialog(
                 Spacer(Modifier.height(12.dp))
 
                 if (info.busy) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Blue700)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Accent)
                     Spacer(Modifier.height(12.dp))
                 }
 
@@ -174,7 +174,7 @@ fun ApkDialog(
                 )
                 Spacer(Modifier.height(6.dp))
                 Surface(
-                    color = Lavender50,
+                    color = SoftGray,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -190,7 +190,7 @@ fun ApkDialog(
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = info.status,
-                        color = Blue700,
+                        color = Accent,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )

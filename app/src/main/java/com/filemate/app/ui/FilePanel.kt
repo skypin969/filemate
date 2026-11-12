@@ -1,54 +1,58 @@
 package com.filemate.app.ui
 
+import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import com.filemate.app.R
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * Satu panel berkas: judul folder, baris ".." (jika ada folder induk),
- * lalu daftar isi yang sudah disaring. [visible] adalah hasil saringan dari ViewModel.
+ * Satu panel berkas, tampilannya mengikuti NP Manager: baris ".." (jika ada folder induk),
+ * lalu daftar isi yang rapat tanpa garis pemisah. [visible] adalah hasil saringan dari ViewModel.
  */
 @Composable
 fun FilePanel(
     panel: PanelState,
     visible: List<FileItem>,
-    isActive: Boolean,
     parentPath: String?,
     onActivate: () -> Unit,
     onOpenParent: () -> Unit,
@@ -56,36 +60,13 @@ fun FilePanel(
     onLongPress: (FileItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title = folderTitle(panel.path, stringResource(R.string.title_storage))
-
-    Column(modifier = modifier.fillMaxHeight()) {
-        // Garis biru di atas judul menandakan panel yang sedang aktif
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(if (isActive) Blue700 else Color.Transparent),
-        )
-        Text(
-            text = title,
-            color = if (isActive) Ink else Muted,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Lavender50)
-                .clickable(onClick = onActivate)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-        )
-
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onActivate),
+    ) {
         if (panel.loading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Blue700)
-        }
-        if (panel.error) {
-            InfoText(stringResource(R.string.error_open_folder))
-        } else if (!panel.loading && visible.isEmpty()) {
-            InfoText(stringResource(R.string.empty_folder))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NpBlue)
         }
 
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -99,6 +80,11 @@ fun FilePanel(
                     )
                 }
             }
+            if (panel.error) {
+                item(key = "error") { InfoText(stringResource(R.string.error_open_folder)) }
+            } else if (!panel.loading && visible.isEmpty()) {
+                item(key = "empty") { InfoText(stringResource(R.string.empty_folder)) }
+            }
             items(visible, key = { it.path }) { item ->
                 FileRow(
                     item = item,
@@ -107,7 +93,10 @@ fun FilePanel(
                         onActivate()
                         onTap(item)
                     },
-                    onLongClick = { onLongPress(item) },
+                    onLongClick = {
+                        onActivate()
+                        onLongPress(item)
+                    },
                 )
             }
         }
@@ -124,30 +113,22 @@ fun folderTitle(path: String, storageLabel: String): String = when (path) {
 /** Baris ".." di paling atas daftar: naik satu folder. */
 @Composable
 private fun ParentRow(onClick: () -> Unit) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowUp,
-                contentDescription = null,
-                tint = FolderTint,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "..",
-                color = Ink,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        HorizontalDivider(color = LineColor)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Folder,
+            contentDescription = null,
+            tint = NpBlue,
+            modifier = Modifier.size(30.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text = "..", color = Ink, fontSize = 15.sp)
     }
 }
 
@@ -156,10 +137,10 @@ private fun InfoText(text: String) {
     Text(
         text = text,
         color = Muted,
-        fontSize = 13.sp,
+        fontSize = 12.sp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(12.dp),
     )
 }
 
@@ -171,81 +152,111 @@ private fun FileRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(if (selected) Lavender100 else Color.Transparent)
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .heightIn(min = 56.dp)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FileIcon(item)
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name,
-                    color = Ink,
-                    fontSize = 14.sp,
-                    fontWeight = if (item.isApk) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = subtitle(item),
-                    color = Muted,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = Blue700,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (selected) SelectTint else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FileIcon(item)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.name,
+                color = Ink,
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle(item),
+                color = Muted,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        HorizontalDivider(color = LineColor)
+        // Tautan (symlink) diberi tanda panah di kanan, seperti NP Manager
+        if (item.isLink) {
+            Text(text = "->", color = Muted, fontSize = 11.sp)
+        }
     }
 }
 
 @Composable
 private fun FileIcon(item: FileItem) {
-    if (item.isDir) {
-        Icon(
+    when {
+        item.isDir -> Icon(
             imageVector = Icons.Filled.Folder,
             contentDescription = null,
-            tint = FolderTint,
-            modifier = Modifier.size(26.dp),
+            tint = NpBlue,
+            modifier = Modifier.size(30.dp),
         )
-    } else {
-        val label = when {
-            item.isApk -> "APK"
-            item.extension.isEmpty() -> "?"
-            else -> item.extension.take(3)
-        }
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (item.isApk) Blue700 else BadgeGray),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = label,
-                color = if (item.isApk) Color.White else BadgeText,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-            )
+
+        item.isApk -> ApkIcon(item.path)
+
+        else -> Icon(
+            imageVector = Icons.Filled.InsertDriveFile,
+            contentDescription = null,
+            tint = FileTint,
+            modifier = Modifier.size(30.dp),
+        )
+    }
+}
+
+// Ikon APK yang sudah pernah dimuat, supaya tidak dimuat ulang setiap daftar digulir
+private val apkIconCache = ConcurrentHashMap<String, ImageBitmap>()
+
+/** Ikon asli dari dalam berkas APK. Selama belum termuat, tampil ikon Android biasa. */
+@Composable
+private fun ApkIcon(path: String) {
+    val context = LocalContext.current
+    val bitmap by produceState(initialValue = apkIconCache[path], path) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) { loadApkIcon(context, path) }
         }
     }
+    val loaded = bitmap
+    if (loaded != null) {
+        Image(
+            bitmap = loaded,
+            contentDescription = null,
+            modifier = Modifier.size(30.dp),
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Filled.Android,
+            contentDescription = null,
+            tint = Color(0xFF3DDC84),
+            modifier = Modifier.size(30.dp),
+        )
+    }
+}
+
+private fun loadApkIcon(context: Context, path: String): ImageBitmap? = try {
+    val pm = context.packageManager
+    val app = pm.getPackageArchiveInfo(path, 0)?.applicationInfo
+    if (app == null) {
+        null
+    } else {
+        // Tanpa dua baris ini, Android tidak tahu ikon harus diambil dari berkas APK yang mana
+        app.sourceDir = path
+        app.publicSourceDir = path
+        val image = app.loadIcon(pm).toBitmap(96, 96).asImageBitmap()
+        if (apkIconCache.size > 200) apkIconCache.clear()
+        apkIconCache[path] = image
+        image
+    }
+} catch (e: Exception) {
+    null
 }
 
 private fun subtitle(item: FileItem): String {
     val date = formatDate(item.modified)
-    return if (item.isDir) date else "${formatSize(item.size)} · $date"
+    return if (item.isDir) date else "$date  ${formatSize(item.size)}"
 }

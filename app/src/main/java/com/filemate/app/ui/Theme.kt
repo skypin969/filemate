@@ -5,35 +5,39 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 
-// Warna dari desain yang sudah disetujui
-val Indigo900 = Color(0xFF3A1C8C)
-val Blue700 = Color(0xFF2440B0)
-val Cyan500 = Color(0xFF06C8E6)
-val Lavender50 = Color(0xFFF5F3FF)
-val Lavender100 = Color(0xFFEDE9FE)
-val Blue100 = Color(0xFFE0E7FF)
-val Blue200 = Color(0xFFC7D2FE)
-val Ink = Color(0xFF1E1B4B)
-val Muted = Color(0xFF4B5563)
-val LineColor = Color(0xFFEEF2FF)
-val Danger = Color(0xFFB91C1C)
-val FolderTint = Color(0xFF4F46E5)
-val BadgeGray = Color(0xFFF3F4F6)
-val BadgeText = Color(0xFF374151)
+// Warna mengikuti NP Manager (diambil dari tangkapan layar)
+val NpBlue = Color(0xFF409EFF)        // bilah atas, ikon folder
+val NpBlueDark = Color(0xFF2B69AA)    // garis penanda panel aktif
+val Accent = Color(0xFF3076BF)        // tombol teks, judul bagian, sakelar
+val SoftGray = Color(0xFFF5F5F5)      // latar kotak lembut
+val SelectTint = Color(0xFFDCEBFF)    // baris yang dipilih
+val IconBox = Color(0xFFE8F3FF)       // kotak di belakang ikon menu samping
+val PageGray = Color(0xFFFAFAFA)      // latar halaman pengaturan
+val Ink = Color(0xFF111111)           // teks utama
+val Muted = Color(0xFF646464)         // teks kecil, ikon bilah bawah
+val Disabled = Color(0xFFC8C8C8)      // ikon yang tidak aktif
+val LineColor = Color(0xFFE3E3E3)     // garis pemisah
+val Danger = Color(0xFFC62828)        // hapus
+val FileTint = Color(0xFF546E7A)      // ikon berkas biasa
+val MenuIcon = Color(0xFF424242)      // ikon di menu
 
-val HeaderGradient = Brush.horizontalGradient(listOf(Indigo900, Blue700))
+val HeaderBrush: Brush = SolidColor(NpBlue)
 
 private val LightColors = lightColorScheme(
-    primary = Blue700,
+    primary = Accent,
     onPrimary = Color.White,
-    primaryContainer = Blue100,
+    primaryContainer = SelectTint,
     onPrimaryContainer = Ink,
-    secondary = Indigo900,
+    secondary = NpBlue,
     background = Color.White,
     onBackground = Ink,
     surface = Color.White,
     onSurface = Ink,
+    surfaceContainerHigh = Color.White,
+    surfaceContainer = Color.White,
+    surfaceContainerLow = Color.White,
     error = Danger,
 )
 

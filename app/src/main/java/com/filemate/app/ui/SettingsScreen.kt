@@ -47,11 +47,11 @@ fun SettingsScreen(onBack: () -> Unit) {
     val isEnglish = AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("en")
     var showAbout by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(PageGray)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(HeaderGradient)
+                .background(HeaderBrush)
                 .statusBarsPadding()
                 .padding(start = 4.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -66,9 +66,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             Text(
                 text = stringResource(R.string.settings_title),
                 color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp),
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 12.dp),
             )
         }
 
@@ -126,9 +126,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        color = Blue700,
+        color = Accent,
         fontSize = 13.sp,
-        fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
@@ -149,7 +148,7 @@ private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) 
             RadioButton(
                 selected = selected,
                 onClick = onSelect,
-                colors = RadioButtonDefaults.colors(selectedColor = Blue700),
+                colors = RadioButtonDefaults.colors(selectedColor = Accent),
             )
             Spacer(Modifier.width(12.dp))
             Text(text = label, color = Ink, fontSize = 16.sp)

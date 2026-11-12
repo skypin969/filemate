@@ -2,6 +2,7 @@ package com.filemate.app
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -13,7 +14,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Ikon bilah status dibuat putih, karena bilah atas aplikasi berwarna biru
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
 
         // Bahasa awal: Bahasa Indonesia. Jika user sudah memilih English, pilihan itu dipakai.
         if (AppCompatDelegate.getApplicationLocales().isEmpty) {

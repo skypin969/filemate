@@ -13,9 +13,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Ukuran berkas dalam format singkat, misalnya 184 B, 1,2 KB, 12,4 MB. */
+/** Ukuran berkas dalam format singkat seperti NP Manager, misalnya 184B, 1,20K, 12,40M, 9,10G. */
 fun formatSize(bytes: Long): String {
-    val units = listOf("B", "KB", "MB", "GB")
+    val units = listOf("B", "K", "M", "G")
     var value = bytes.toDouble()
     var index = 0
     while (value >= 1024 && index < units.lastIndex) {
@@ -23,16 +23,22 @@ fun formatSize(bytes: Long): String {
         index++
     }
     return if (index == 0) {
-        "$bytes B"
+        "${bytes}B"
     } else {
-        String.format(Locale.getDefault(), "%.1f %s", value, units[index])
+        String.format(Locale.getDefault(), "%.2f%s", value, units[index])
     }
 }
 
-/** Tanggal dalam format yy-MM-dd HH:mm. */
+/** Tanggal dalam format yy-MM-dd HH:mm, dipakai di daftar berkas. */
 fun formatDate(millis: Long): String {
     if (millis <= 0L) return "-"
     return SimpleDateFormat("yy-MM-dd HH:mm", Locale.US).format(Date(millis))
+}
+
+/** Tanggal lengkap dengan detik, dipakai di dialog atribut. */
+fun formatDateFull(millis: Long): String {
+    if (millis <= 0L) return "-"
+    return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(millis))
 }
 
 /** Jenis MIME dari akhiran berkas, dipakai saat membuka atau membagikan. */

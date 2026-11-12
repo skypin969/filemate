@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FF2440B0</color>
-    <color name="brand_indigo">#FF3A1C8C</color>
-    <color name="brand_blue">#FF2440B0</color>
+    <color name="brand_indigo">#FF3076BF</color>
+    <color name="brand_blue">#FF409EFF</color>
     <color name="brand_cyan">#FF06C8E6</color>
 </resources>

@@ -63,8 +63,10 @@ fun PermissionScreen(onGranted: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            // Biru hanya di belakang bilah status, supaya ikon putihnya tetap terlihat
+            .background(NpBlue)
             .statusBarsPadding()
+            .background(Color.White)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 32.dp),
     ) {
@@ -72,13 +74,13 @@ fun PermissionScreen(onGranted: () -> Unit) {
             modifier = Modifier
                 .size(72.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(Lavender100),
+                .background(SelectTint),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.Folder,
                 contentDescription = null,
-                tint = Indigo900,
+                tint = NpBlue,
                 modifier = Modifier.size(36.dp),
             )
         }
@@ -104,7 +106,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Lavender50)
+                .background(SoftGray)
                 .padding(16.dp),
         ) {
             Text("1. " + stringResource(R.string.perm_step_1), color = Ink, fontSize = 15.sp, lineHeight = 24.sp)
@@ -130,7 +132,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
                 .fillMaxWidth()
                 .height(52.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Blue700),
+            colors = ButtonDefaults.buttonColors(containerColor = Accent),
         ) {
             Text(
                 text = stringResource(R.string.perm_open_settings),
@@ -154,7 +156,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
         ) {
             Text(
                 text = stringResource(R.string.perm_check_again),
-                color = Blue700,
+                color = Accent,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
             )

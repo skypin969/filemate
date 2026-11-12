@@ -20,8 +20,6 @@
 
     <!-- Main screen -->
     <string name="title_storage">Internal storage</string>
-    <string name="title_root">Root access</string>
-    <string name="btn_dual">Dual pane</string>
     <string name="cd_menu">Open menu</string>
     <string name="cd_more">More options</string>
     <string name="cd_close">Close</string>
@@ -32,8 +30,6 @@
     <string name="btn_rename">Rename</string>
     <string name="btn_delete">Delete</string>
     <string name="btn_apk_tools">APK tools</string>
-    <string name="btn_new_folder">New folder</string>
-    <string name="btn_sort">Sort</string>
     <string name="btn_paste">Paste (%1$d)</string>
     <string name="btn_cancel">Cancel</string>
     <string name="btn_close">Close</string>
@@ -55,11 +51,7 @@
     <!-- Overflow menu -->
     <string name="menu_search">Search</string>
     <string name="menu_select_all">Select all</string>
-    <string name="menu_sort_name">Sort: Name</string>
-    <string name="menu_sort_size">Sort: Size</string>
-    <string name="menu_sort_date">Sort: Date</string>
     <string name="menu_filter">Filter by file type</string>
-    <string name="menu_show_hidden">Show hidden files</string>
     <string name="menu_bookmark">Add to bookmarks</string>
     <string name="menu_exit">Exit</string>
     <string name="menu_select">Select</string>
@@ -170,15 +162,23 @@
     <string name="about_body">Version 1.0. A file manager with tools to unpack, sign, and repack APKs.</string>
 
     <!-- Navigation drawer -->
-    <string name="drawer_storage">Internal storage</string>
-    <string name="drawer_storage_used">%1$s of %2$s used</string>
-    <string name="drawer_download">Download</string>
-    <string name="drawer_documents">Documents</string>
-    <string name="drawer_dcim">DCIM</string>
     <string name="drawer_bookmarks">Bookmarks</string>
     <string name="drawer_bookmarks_empty">No bookmarks yet. Open the three-dot menu, then choose Add to bookmarks.</string>
     <string name="cd_remove_bookmark">Remove bookmark</string>
     <string name="drawer_root">Root access</string>
     <string name="drawer_root_desc">View system folders. Requires a rooted phone.</string>
     <string name="drawer_settings">Settings</string>
+    <!-- NP Manager style -->
+    <string name="top_info">folders: %1$d files: %2$d storage: %3$s/%4$s %5$s</string>
+    <string name="top_rw">read-write</string>
+    <string name="top_ro">read-only</string>
+    <string name="menu_sort">Sort by</string>
+    <string name="menu_hide_files">Hide hidden files</string>
+    <string name="btn_ok">OK</string>
+    <string name="drawer_section_local">Local</string>
+    <string name="drawer_section_tools">Tools</string>
+    <string name="drawer_root_dir">Root directory</string>
+    <string name="drawer_usage">%1$s used, %2$s free</string>
+    <string name="editor_encoding">UTF-8</string>
+    <string name="editor_hex_label">HEX</string>
 </resources>

@@ -20,8 +20,6 @@
 
     <!-- Layar utama -->
     <string name="title_storage">Penyimpanan internal</string>
-    <string name="title_root">Akses root</string>
-    <string name="btn_dual">Dua panel</string>
     <string name="cd_menu">Buka menu</string>
     <string name="cd_more">Menu lainnya</string>
     <string name="cd_close">Tutup</string>
@@ -32,8 +30,6 @@
     <string name="btn_rename">Ubah nama</string>
     <string name="btn_delete">Hapus</string>
     <string name="btn_apk_tools">Alat APK</string>
-    <string name="btn_new_folder">Buat folder</string>
-    <string name="btn_sort">Urutkan</string>
     <string name="btn_paste">Tempel (%1$d)</string>
     <string name="btn_cancel">Batal</string>
     <string name="btn_close">Tutup</string>
@@ -55,17 +51,13 @@
     <!-- Menu titik tiga -->
     <string name="menu_search">Cari</string>
     <string name="menu_select_all">Pilih semua</string>
-    <string name="menu_sort_name">Urutkan: Nama</string>
-    <string name="menu_sort_size">Urutkan: Ukuran</string>
-    <string name="menu_sort_date">Urutkan: Tanggal</string>
-    <string name="menu_filter">Filter jenis berkas</string>
-    <string name="menu_show_hidden">Tampilkan file tersembunyi</string>
-    <string name="menu_bookmark">Tambah ke bookmark</string>
+    <string name="menu_filter">Filter</string>
+    <string name="menu_bookmark">Tambah bookmark</string>
     <string name="menu_exit">Keluar</string>
     <string name="menu_select">Pilih</string>
     <string name="menu_copy_other">Salin ke panel sebelah</string>
     <string name="menu_move_other">Pindah ke panel sebelah</string>
-    <string name="menu_compress">Kompres ke ZIP</string>
+    <string name="menu_compress">Kompres</string>
     <string name="menu_extract">Ekstrak ZIP</string>
     <string name="menu_attributes">Atribut</string>
     <string name="menu_share">Bagikan</string>
@@ -115,14 +107,14 @@
     <string name="msg_extract_failed">Gagal mengekstrak ZIP. Berkas mungkin rusak.</string>
     <string name="dialog_attributes_title">Atribut</string>
     <string name="attr_name">Nama</string>
-    <string name="attr_location">Lokasi</string>
+    <string name="attr_location">Direktori</string>
     <string name="attr_type">Jenis</string>
     <string name="attr_type_folder">Folder</string>
     <string name="attr_type_file">Berkas</string>
     <string name="attr_size">Ukuran</string>
-    <string name="attr_modified">Terakhir diubah</string>
+    <string name="attr_modified">Waktu modifikasi</string>
     <string name="menu_edit_text">Edit teks</string>
-    <string name="menu_edit_hex">Edit hex</string>
+    <string name="menu_edit_hex">Edit heksadesimal</string>
     <string name="btn_save">Simpan</string>
     <string name="btn_discard">Buang</string>
     <string name="cd_back">Kembali</string>
@@ -170,15 +162,23 @@
     <string name="about_body">Versi 1.0. File manager dengan alat untuk membongkar, menandatangani, dan merakit ulang APK.</string>
 
     <!-- Menu samping -->
-    <string name="drawer_storage">Penyimpanan internal</string>
-    <string name="drawer_storage_used">%1$s dari %2$s terpakai</string>
-    <string name="drawer_download">Download</string>
-    <string name="drawer_documents">Documents</string>
-    <string name="drawer_dcim">DCIM</string>
     <string name="drawer_bookmarks">Bookmark</string>
-    <string name="drawer_bookmarks_empty">Belum ada bookmark. Buka menu titik tiga, lalu pilih Tambah ke bookmark.</string>
+    <string name="drawer_bookmarks_empty">Belum ada bookmark. Buka menu titik tiga, lalu pilih Tambah bookmark.</string>
     <string name="cd_remove_bookmark">Hapus bookmark</string>
     <string name="drawer_root">Akses root</string>
     <string name="drawer_root_desc">Lihat folder sistem. Butuh HP yang sudah di-root.</string>
     <string name="drawer_settings">Pengaturan</string>
+    <!-- Tampilan gaya NP Manager -->
+    <string name="top_info">folder: %1$d berkas: %2$d penyimpanan: %3$s/%4$s %5$s</string>
+    <string name="top_rw">baca-tulis</string>
+    <string name="top_ro">hanya baca</string>
+    <string name="menu_sort">Urutkan menurut</string>
+    <string name="menu_hide_files">Sembunyikan file</string>
+    <string name="btn_ok">OK</string>
+    <string name="drawer_section_local">Lokal</string>
+    <string name="drawer_section_tools">Alat</string>
+    <string name="drawer_root_dir">Direktori root</string>
+    <string name="drawer_usage">%1$s terpakai, %2$s tersedia</string>
+    <string name="editor_encoding">UTF-8</string>
+    <string name="editor_hex_label">HEX</string>
 </resources>
