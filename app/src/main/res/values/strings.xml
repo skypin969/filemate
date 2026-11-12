@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Filemate</string>
+    <string name="cd_app_icon">Ikon Filemate</string>
+
+    <!-- Layar pembuka -->
+    <string name="splash_tagline">Kelola berkas dan bongkar APK di HP Anda</string>
+    <string name="splash_loading">Memuat...</string>
+
+    <!-- Layar izin akses -->
+    <string name="perm_title">Izinkan akses ke semua berkas</string>
+    <string name="perm_body">Filemate perlu membaca dan mengubah berkas di penyimpanan HP, termasuk folder di luar aplikasi ini. Izin diberikan lewat pengaturan Android.</string>
+    <string name="perm_step_1">Ketuk tombol Buka pengaturan di bawah.</string>
+    <string name="perm_step_2">Aktifkan izin akses ke semua berkas untuk Filemate.</string>
+    <string name="perm_step_3">Kembali ke Filemate.</string>
+    <string name="perm_note">Tanpa izin ini, Filemate tidak bisa dibuka.</string>
+    <string name="perm_open_settings">Buka pengaturan</string>
+    <string name="perm_check_again">Periksa lagi</string>
+    <string name="perm_not_yet">Izin belum aktif. Aktifkan dulu di pengaturan.</string>
+
+    <!-- Layar utama -->
+    <string name="title_storage">Penyimpanan internal</string>
+    <string name="title_root">Akses root</string>
+    <string name="btn_dual">Dua panel</string>
+    <string name="cd_menu">Buka menu</string>
+    <string name="cd_search">Cari berkas</string>
+    <string name="cd_close">Tutup</string>
+    <string name="search_hint">Cari berkas</string>
+    <string name="selected_count">%1$d dipilih</string>
+    <string name="btn_copy">Salin</string>
+    <string name="btn_move">Pindah</string>
+    <string name="btn_rename">Ubah nama</string>
+    <string name="btn_delete">Hapus</string>
+    <string name="btn_apk_tools">Alat APK</string>
+    <string name="btn_new_folder">Buat folder</string>
+    <string name="btn_sort">Urutkan</string>
+    <string name="btn_paste">Tempel (%1$d)</string>
+    <string name="btn_cancel">Batal</string>
+    <string name="btn_close">Tutup</string>
+    <string name="btn_create">Buat</string>
+    <string name="btn_continue">Lanjutkan</string>
+    <string name="sort_name">Nama</string>
+    <string name="sort_size">Ukuran</string>
+    <string name="sort_date">Tanggal</string>
+    <string name="empty_folder">Folder kosong</string>
+    <string name="error_open_folder">Folder tidak bisa dibuka. Pastikan izin akses sudah diberikan.</string>
+
+    <!-- Dialog -->
+    <string name="dialog_new_folder">Buat folder baru</string>
+    <string name="label_folder_name">Nama folder</string>
+    <string name="dialog_rename">Ubah nama</string>
+    <string name="label_new_name">Nama baru</string>
+    <string name="confirm_delete_title">Hapus item?</string>
+    <string name="confirm_delete_body">Hapus %1$d item yang dipilih? Tindakan ini tidak bisa dibatalkan.</string>
+    <string name="confirm_paste_title">Tempel di sini?</string>
+    <string name="confirm_paste_body">Tempel %1$d item ke folder ini?</string>
+    <string name="confirm_rename_title">Ubah nama?</string>
+    <string name="confirm_rename_body">Ubah nama berkas ini?</string>
+    <string name="confirm_new_title">Buat folder?</string>
+    <string name="confirm_new_body">Buat folder baru di lokasi ini?</string>
+    <string name="confirm_generic_title">Lanjutkan?</string>
+    <string name="warn_system">Ini folder sistem. Salah mengubah atau menghapus berkas di sini bisa membuat HP tidak bisa menyala.</string>
+    <string name="warn_understand">Saya paham risikonya</string>
+
+    <!-- Pesan singkat -->
+    <string name="msg_deleted">%1$d item dihapus.</string>
+    <string name="msg_failed">Gagal. Coba lagi.</string>
+    <string name="msg_paste_result">%1$d dari %2$d item berhasil.</string>
+    <string name="msg_renamed">Nama berhasil diubah.</string>
+    <string name="msg_folder_created">Folder dibuat.</string>
+    <string name="msg_invalid_name">Nama tidak valid.</string>
+    <string name="msg_name_exists">Nama sudah dipakai.</string>
+    <string name="msg_root_denied">Akses root tidak tersedia. Pastikan HP sudah di-root dan izin superuser diberikan.</string>
+    <string name="msg_root_on">Mode root aktif.</string>
+    <string name="msg_root_off">Mode root dimatikan.</string>
+    <string name="msg_clip_ready">Buka folder tujuan, lalu tekan Tempel.</string>
+    <string name="msg_cannot_open">File ini tidak bisa dibuka.</string>
+
+    <!-- Alat APK -->
+    <string name="apk_intro">Bongkar: isi APK dibuka ke folder Filemate. Rakit ulang: folder hasil bongkar dikemas lagi jadi APK baru. Tanda tangan: APK diberi tanda tangan supaya bisa dipasang.</string>
+    <string name="apk_manifest_title">Isi AndroidManifest (teks)</string>
+    <string name="apk_manifest_empty">Belum ada data.</string>
+    <string name="apk_manifest_failed">Isi manifest tidak bisa dibaca.</string>
+    <string name="apk_btn_unpack">Bongkar</string>
+    <string name="apk_btn_repack">Rakit ulang</string>
+    <string name="apk_btn_sign">Tanda tangan</string>
+    <string name="msg_apk_unpacked">Berhasil dibongkar ke: %1$s</string>
+    <string name="msg_apk_repacked">Berhasil dirakit ulang: %1$s (belum ditandatangani)</string>
+    <string name="msg_apk_signed">Berhasil ditandatangani: %1$s</string>
+    <string name="msg_apk_failed">Gagal memproses APK.</string>
+    <string name="msg_need_unpack">Bongkar APK dulu sebelum rakit ulang.</string>
+
+    <!-- Pengaturan -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_back">Kembali</string>
+    <string name="settings_lang_header">Bahasa</string>
+    <string name="settings_lang_id">Bahasa Indonesia</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_other_header">Lainnya</string>
+    <string name="settings_about">Tentang Filemate</string>
+    <string name="about_title">Tentang Filemate</string>
+    <string name="about_body">Versi 1.0. File manager dengan alat untuk membongkar, menandatangani, dan merakit ulang APK.</string>
+
+    <!-- Menu samping -->
+    <string name="drawer_storage">Penyimpanan internal</string>
+    <string name="drawer_download">Download</string>
+    <string name="drawer_documents">Documents</string>
+    <string name="drawer_dcim">DCIM</string>
+    <string name="drawer_root">Akses root</string>
+    <string name="drawer_root_desc">Lihat folder sistem. Butuh HP yang sudah di-root.</string>
+    <string name="drawer_settings">Pengaturan</string>
+</resources>
