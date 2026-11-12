@@ -16,8 +16,9 @@ object FileRepository {
     const val FILEMATE_DIR = "/storage/emulated/0/Filemate"
 
     // Baris keluaran `ls -la`, contoh: -rw-rw---- 1 root sdcard_rw 1234 2026-11-12 10:00 nama.txt
+    // Kolom: izin, jumlah link, pemilik, grup, ukuran, tanggal, nama
     private val lsLine = Regex(
-        "^([-bcdlps][rwxsStTl-]{9}[.+@]?)\\s+\\S+\\s+\\S+\\s+(\\d+)\\s+" +
+        "^([-bcdlps][rwxsStTl-]{9}[.+@]?)\\s+\\S+\\s+\\S+\\s+\\S+\\s+(\\d+)\\s+" +
             "(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}|[A-Za-z]{3}\\s+\\d{1,2}\\s+(?:\\d{2}:\\d{2}|\\d{4}))\\s+(.+)$"
     )
 
