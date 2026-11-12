@@ -8,19 +8,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,13 +44,20 @@ import androidx.core.os.LocaleListCompat
 import com.filemate.app.R
 
 /**
- * Layar pengaturan: pilihan bahasa (Indonesia / English) dan informasi aplikasi.
- * Mengganti bahasa membuat aplikasi tampil ulang dalam bahasa baru.
+ * Layar pengaturan, susunannya mengikuti NP Manager: judul bagian berwarna biru,
+ * lalu baris berisi judul, keterangan abu-abu, dan sakelar di kanan.
+ * Hanya pengaturan yang benar-benar berfungsi yang ditampilkan.
  */
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { AppPrefs.of(context) }
     val isEnglish = AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("en")
+    var rootAtStart by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_ROOT_START, false)) }
+    var backup by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_BACKUP, false)) }
+    var home by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()) }
     var showAbout by remember { mutableStateOf(false) }
+    var showLanguage by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(PageGray)) {
         Row(
@@ -53,7 +65,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .fillMaxWidth()
                 .background(HeaderBrush)
                 .statusBarsPadding()
-                .padding(start = 4.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                .height(56.dp)
+                .padding(start = 4.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -72,50 +85,96 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         }
 
-        SectionTitle(stringResource(R.string.settings_lang_header))
-        LanguageRow(
-            label = stringResource(R.string.settings_lang_id),
-            selected = !isEnglish,
-            onSelect = { setLanguage("id") },
-        )
-        LanguageRow(
-            label = stringResource(R.string.settings_lang_en),
-            selected = isEnglish,
-            onSelect = { setLanguage("en") },
-        )
-
-        SectionTitle(stringResource(R.string.settings_other_header))
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showAbout = true }
-                .heightIn(min = 56.dp)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
         ) {
-            Text(
-                text = stringResource(R.string.settings_about),
-                color = Ink,
-                fontSize = 16.sp,
-                modifier = Modifier.weight(1f),
+            SectionTitle(stringResource(R.string.settings_start_header))
+            SettingRow(
+                title = stringResource(R.string.settings_root_title),
+                subtitle = stringResource(R.string.settings_root_desc),
+                checked = rootAtStart,
+                onClick = {
+                    rootAtStart = !rootAtStart
+                    prefs.edit().putBoolean(AppPrefs.KEY_ROOT_START, rootAtStart).apply()
+                },
             )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = Muted,
+            SettingRow(
+                title = stringResource(R.string.settings_home_title),
+                subtitle = if (home.isEmpty()) {
+                    stringResource(R.string.title_storage)
+                } else {
+                    home + "\n" + stringResource(R.string.settings_home_reset)
+                },
+                onClick = {
+                    home = ""
+                    prefs.edit().remove(AppPrefs.KEY_HOME).apply()
+                },
+            )
+
+            SectionTitle(stringResource(R.string.settings_display_header))
+            SettingRow(
+                title = stringResource(R.string.settings_lang_header),
+                subtitle = stringResource(if (isEnglish) R.string.settings_lang_en else R.string.settings_lang_id),
+                onClick = { showLanguage = true },
+            )
+
+            SectionTitle(stringResource(R.string.settings_general_header))
+            SettingRow(
+                title = stringResource(R.string.settings_backup_title),
+                subtitle = stringResource(R.string.settings_backup_desc),
+                checked = backup,
+                onClick = {
+                    backup = !backup
+                    prefs.edit().putBoolean(AppPrefs.KEY_BACKUP, backup).apply()
+                },
+            )
+
+            SectionTitle(stringResource(R.string.settings_other_header))
+            SettingRow(
+                title = stringResource(R.string.settings_about),
+                subtitle = null,
+                onClick = { showAbout = true },
             )
         }
-        HorizontalDivider(color = LineColor)
+    }
+
+    if (showLanguage) {
+        AlertDialog(
+            onDismissRequest = { showLanguage = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.settings_lang_header), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    LanguageRow(stringResource(R.string.settings_lang_id), !isEnglish) {
+                        showLanguage = false
+                        setLanguage("id")
+                    }
+                    LanguageRow(stringResource(R.string.settings_lang_en), isEnglish) {
+                        showLanguage = false
+                        setLanguage("en")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguage = false }) {
+                    Text(stringResource(R.string.btn_cancel), color = Accent)
+                }
+            },
+        )
     }
 
     if (showAbout) {
         AlertDialog(
             onDismissRequest = { showAbout = false },
-            title = { Text(stringResource(R.string.about_title)) },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.about_title), fontWeight = FontWeight.SemiBold) },
             text = { Text(stringResource(R.string.about_body)) },
             confirmButton = {
                 TextButton(onClick = { showAbout = false }) {
-                    Text(stringResource(R.string.btn_close))
+                    Text(stringResource(R.string.btn_ok), color = Accent)
                 }
             },
         )
@@ -130,30 +189,61 @@ private fun SectionTitle(text: String) {
         fontSize = 13.sp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 8.dp),
     )
+}
+
+/** Satu baris pengaturan. Jika [checked] diisi, sakelar tampil di kanan. */
+@Composable
+private fun SettingRow(
+    title: String,
+    subtitle: String?,
+    checked: Boolean? = null,
+    onClick: () -> Unit,
+) {
+    Column(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, color = MenuIcon, fontSize = 16.sp)
+                if (subtitle != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(text = subtitle, color = Muted, fontSize = 13.sp, lineHeight = 17.sp)
+                }
+            }
+            if (checked != null) {
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = checked,
+                    onCheckedChange = { onClick() },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Accent),
+                )
+            }
+        }
+        HorizontalDivider(color = LineColor, modifier = Modifier.padding(horizontal = 20.dp))
+    }
 }
 
 @Composable
 private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onSelect)
-                .heightIn(min = 56.dp)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(
-                selected = selected,
-                onClick = onSelect,
-                colors = RadioButtonDefaults.colors(selectedColor = Accent),
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(text = label, color = Ink, fontSize = 16.sp)
-        }
-        HorizontalDivider(color = LineColor)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onSelect,
+            colors = RadioButtonDefaults.colors(selectedColor = Accent),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text = label, color = Ink, fontSize = 16.sp)
     }
 }
 

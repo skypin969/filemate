@@ -1,7 +1,6 @@
 package com.filemate.app.ui
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.filemate.app.R
@@ -121,13 +120,60 @@ fun visibleItems(
 
 class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = AppPrefs.of(app)
 
-    private val _state = MutableStateFlow(UiState(bookmarks = loadBookmarks()))
+    private val _state = MutableStateFlow(
+        UiState(
+            bookmarks = loadBookmarks(),
+            panels = startFolder().let { listOf(PanelState(it), PanelState(it)) },
+        ),
+    )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
         reloadAll()
+        // Pengaturan "Minta akses root saat memulai"
+        if (prefs.getBoolean(AppPrefs.KEY_ROOT_START, false)) setRootMode(true, quiet = true)
+    }
+
+    /** Folder awal: folder beranda pilihan user jika masih bisa dibuka, kalau tidak penyimpanan internal. */
+    private fun startFolder(): String {
+        val home = prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()
+        val usable = home.startsWith(FileRepository.STORAGE_ROOT) && File(home).isDirectory
+        return if (usable) home else FileRepository.STORAGE_ROOT
+    }
+
+    /** Menu titik tiga "Atur sebagai beranda": folder ini dibuka setiap aplikasi mulai. */
+    fun setHome(path: String) {
+        if (!path.startsWith(FileRepository.STORAGE_ROOT)) {
+            _state.update { it.copy(message = text(R.string.msg_home_storage_only)) }
+            return
+        }
+        prefs.edit().putString(AppPrefs.KEY_HOME, path).apply()
+        _state.update { it.copy(message = text(R.string.msg_home_set)) }
+    }
+
+    /** Menampilkan pesan singkat di bawah layar. */
+    fun notify(message: String) {
+        _state.update { it.copy(message = message) }
+    }
+
+    /** Menu samping "Direktori root": membuka "/". Akses root diminta dulu jika belum aktif. */
+    fun openRootDir() {
+        if (_state.value.rootMode) {
+            openFolder(_state.value.active, "/")
+            return
+        }
+        viewModelScope.launch {
+            val granted = withContext(Dispatchers.IO) { RootShell.isGranted() }
+            if (granted) {
+                _state.update { it.copy(rootMode = true) }
+                openFolder(_state.value.active, "/")
+                reloadAll()
+            } else {
+                _state.update { it.copy(message = text(R.string.msg_root_denied)) }
+            }
+        }
     }
 
     private fun text(id: Int, vararg args: Any): String =
@@ -349,7 +395,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         if (enabled) reloadAll()
     }
 
-    fun setRootMode(enabled: Boolean) {
+    /** [quiet] dipakai saat aplikasi mulai, supaya tidak muncul pesan jika root tidak tersedia. */
+    fun setRootMode(enabled: Boolean, quiet: Boolean = false) {
         if (!enabled) {
             _state.update { s ->
                 s.copy(
@@ -374,9 +421,9 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val granted = withContext(Dispatchers.IO) { RootShell.isGranted() }
             if (granted) {
-                _state.update { it.copy(rootMode = true, message = text(R.string.msg_root_on)) }
+                _state.update { it.copy(rootMode = true, message = if (quiet) null else text(R.string.msg_root_on)) }
                 reloadAll()
-            } else {
+            } else if (!quiet) {
                 _state.update { it.copy(message = text(R.string.msg_root_denied)) }
             }
         }
@@ -406,10 +453,10 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadBookmarks(): List<String> =
-        prefs.getString(KEY_BOOKMARKS, "").orEmpty().lines().filter { it.isNotBlank() }
+        prefs.getString(AppPrefs.KEY_BOOKMARKS, "").orEmpty().lines().filter { it.isNotBlank() }
 
     private fun saveBookmarks(list: List<String>) {
-        prefs.edit().putString(KEY_BOOKMARKS, list.joinToString("\n")).apply()
+        prefs.edit().putString(AppPrefs.KEY_BOOKMARKS, list.joinToString("\n")).apply()
     }
 
     // ---------- Dialog dan tindakan ----------
@@ -733,7 +780,5 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val MAX_MANIFEST_CHARS = 20000
         private const val MAX_HISTORY = 50
-        private const val PREFS_NAME = "filemate"
-        private const val KEY_BOOKMARKS = "bookmarks"
     }
 }

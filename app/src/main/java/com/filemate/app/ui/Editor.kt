@@ -15,6 +15,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -163,17 +174,25 @@ private fun readPage(file: File, page: Int): ByteArray {
 
 // ---------- Editor teks ----------
 
+// Simbol di baris bawah editor, seperti NP Manager. "Tab" menyisipkan empat spasi.
+private val SYMBOLS = listOf("Tab", "<", ">", "=", "\"", ":", "@", "+", "-", "/", "(", ")", "{", "}", "[", "]", ";", ".", ",", "_", "#", "$", "&", "|", "!", "?", "*", "'")
+private const val MAX_UNDO = 100
+
 @Composable
 private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var work by remember { mutableStateOf<Workfile?>(null) }
-    var text by remember { mutableStateOf("") }
+    var value by remember { mutableStateOf(TextFieldValue("")) }
     var saved by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var confirmExit by remember { mutableStateOf(false) }
+    // Isi sebelum setiap perubahan, untuk tombol urung dan ulang
+    val undoStack = remember { mutableStateListOf<String>() }
+    val redoStack = remember { mutableStateListOf<String>() }
 
+    val text = value.text
     val dirty = work != null && text != saved
 
     fun close() {
@@ -190,18 +209,53 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
     LaunchedEffect(target) {
         val opened = withContext(Dispatchers.IO) { openForText(context, target) }
         work = opened.work
-        text = opened.text
+        value = TextFieldValue(opened.text)
         saved = opened.text
         error = opened.error
         loading = false
     }
 
+    /** Mengganti isi editor dan mencatat isi lama supaya bisa diurungkan. */
+    fun change(next: TextFieldValue) {
+        if (next.text != value.text) {
+            undoStack.add(value.text)
+            if (undoStack.size > MAX_UNDO) undoStack.removeAt(0)
+            redoStack.clear()
+        }
+        value = next
+    }
+
+    fun undo() {
+        val previous = undoStack.removeLastOrNull() ?: return
+        redoStack.add(value.text)
+        value = TextFieldValue(previous, TextRange(minOf(value.selection.start, previous.length)))
+    }
+
+    fun redo() {
+        val next = redoStack.removeLastOrNull() ?: return
+        undoStack.add(value.text)
+        value = TextFieldValue(next, TextRange(minOf(value.selection.start, next.length)))
+    }
+
+    /** Menyisipkan simbol di posisi kursor (atau mengganti teks yang diblok). */
+    fun insert(symbol: String) {
+        val piece = if (symbol == "Tab") "    " else symbol
+        val from = value.selection.min
+        val to = value.selection.max
+        change(TextFieldValue(value.text.replaceRange(from, to, piece), TextRange(from + piece.length)))
+    }
+
     fun save() {
         val current = work ?: return
-        val content = text
+        val content = value.text
+        val backup = AppPrefs.of(context).getBoolean(AppPrefs.KEY_BACKUP, false)
         scope.launch {
             val ok = withContext(Dispatchers.IO) {
                 try {
+                    // Pengaturan "Buat file cadangan": isi lama disimpan sebagai nama.bak di folder yang sama
+                    if (backup && !current.isCopy) {
+                        current.file.copyTo(File(target.path + ".bak"), overwrite = true)
+                    }
                     current.file.writeBytes(content.toByteArray(Charsets.UTF_8))
                     commitWorkfile(current, target.path)
                 } catch (e: Exception) {
@@ -217,30 +271,81 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
         }
     }
 
+    // Posisi kursor "baris:kolom" untuk baris keterangan di bawah bilah atas
+    val cursor = value.selection.start.coerceIn(0, text.length)
+    val line = text.count(0, cursor, '\n') + 1
+    val column = cursor - (text.lastIndexOf('\n', cursor - 1) + 1) + 1
+    val lineCount = remember(text) { text.count { it == '\n' } + 1 }
+    val numbers = remember(lineCount) { (1..lineCount).joinToString("\n") }
+    val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 18.sp, color = Ink)
+    val ready = work != null && !loading
+
     val err = error
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(Color.White).imePadding()) {
         EditorTopBar(
             title = FileRepository.nameOf(target.path),
-            info = stringResource(R.string.editor_encoding),
+            info = "$line:$column  " + stringResource(R.string.editor_encoding),
             onBack = { requestClose() },
-            canSave = work != null && !loading,
+            canSave = ready,
             onSave = { save() },
+            canUndo = ready && undoStack.isNotEmpty(),
+            onUndo = { undo() },
+            canRedo = ready && redoStack.isNotEmpty(),
+            onRedo = { redo() },
         )
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopStart,
         ) {
             when {
                 loading -> CenterMessage(stringResource(R.string.editor_loading))
                 err != null -> CenterMessage(err)
-                // Kolom teks polos tanpa bingkai, memenuhi layar seperti editor NP Manager
-                else -> BasicTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Ink),
-                    cursorBrush = SolidColor(Accent),
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp),
-                )
+                // Nomor baris di kiri dan teks di kanan digulir bersama. Teks tidak dilipat,
+                // jadi baris panjang digeser ke samping dan nomor baris tetap sejajar.
+                else -> Row(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    Text(
+                        text = numbers,
+                        style = style,
+                        color = Disabled,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier
+                            .background(SoftGray)
+                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    )
+                    Box(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                        BasicTextField(
+                            value = value,
+                            onValueChange = { change(it) },
+                            textStyle = style,
+                            cursorBrush = SolidColor(Accent),
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 360.dp, minHeight = 300.dp)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (ready && err == null) {
+            HorizontalDivider(color = LineColor)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                SYMBOLS.forEach { symbol ->
+                    Text(
+                        text = symbol,
+                        color = Ink,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable { insert(symbol) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
             }
         }
     }
@@ -254,6 +359,13 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
             },
         )
     }
+}
+
+/** Jumlah [ch] di antara posisi [from] (termasuk) dan [to] (tidak termasuk). */
+private fun String.count(from: Int, to: Int, ch: Char): Int {
+    var total = 0
+    for (i in from until to) if (this[i] == ch) total++
+    return total
 }
 
 // ---------- Editor hex ----------
@@ -535,6 +647,10 @@ private fun EditorTopBar(
     onBack: () -> Unit,
     canSave: Boolean,
     onSave: () -> Unit,
+    canUndo: Boolean = false,
+    onUndo: (() -> Unit)? = null,
+    canRedo: Boolean = false,
+    onRedo: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -556,6 +672,25 @@ private fun EditorTopBar(
                 )
             }
             Spacer(Modifier.weight(1f))
+            // Urung dan ulang hanya ada di editor teks
+            if (onUndo != null) {
+                IconButton(onClick = onUndo, enabled = canUndo) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = stringResource(R.string.editor_undo),
+                        tint = if (canUndo) Color.White else Color.White.copy(alpha = 0.45f),
+                    )
+                }
+            }
+            if (onRedo != null) {
+                IconButton(onClick = onRedo, enabled = canRedo) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = stringResource(R.string.editor_redo),
+                        tint = if (canRedo) Color.White else Color.White.copy(alpha = 0.45f),
+                    )
+                }
+            }
             IconButton(onClick = onSave, enabled = canSave) {
                 Icon(
                     imageVector = Icons.Filled.Save,

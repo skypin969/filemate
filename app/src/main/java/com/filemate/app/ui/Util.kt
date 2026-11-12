@@ -62,6 +62,19 @@ fun openFile(context: Context, item: FileItem) {
     }
 }
 
+/** Membuka berkas dengan aplikasi lain, dengan jenis yang ditentukan (misalnya "image/*" untuk penampil gambar). */
+fun openFileAs(context: Context, item: FileItem, mime: String) {
+    try {
+        val uri = uriOf(context, item)
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, mime)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+    }
+}
+
 /** Mengirim berkas lewat aplikasi lain (WhatsApp, Gmail, Bluetooth, dan lainnya). */
 fun shareFile(context: Context, item: FileItem) {
     try {

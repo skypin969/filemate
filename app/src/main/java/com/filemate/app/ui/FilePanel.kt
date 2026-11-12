@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +58,7 @@ fun FilePanel(
     onActivate: () -> Unit,
     onOpenParent: () -> Unit,
     onTap: (FileItem) -> Unit,
+    onIconTap: (FileItem) -> Unit,
     onLongPress: (FileItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -93,6 +95,7 @@ fun FilePanel(
                         onActivate()
                         onTap(item)
                     },
+                    onIconClick = { onIconTap(item) },
                     onLongClick = {
                         onActivate()
                         onLongPress(item)
@@ -150,6 +153,7 @@ private fun FileRow(
     item: FileItem,
     selected: Boolean,
     onClick: () -> Unit,
+    onIconClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     Row(
@@ -161,7 +165,10 @@ private fun FileRow(
             .padding(horizontal = 6.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FileIcon(item)
+        // Mengetuk ikon memilih berkas ini (bisa beberapa sekaligus), seperti NP Manager
+        Box(modifier = Modifier.clickable(onClick = onIconClick)) {
+            FileIcon(item)
+        }
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

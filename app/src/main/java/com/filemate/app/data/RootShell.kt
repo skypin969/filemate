@@ -23,6 +23,23 @@ object RootShell {
         }
     }
 
+    /** Menjalankan perintah sebagai aplikasi biasa (tanpa root) lewat `sh -c`. */
+    fun sh(command: String): ShellResult {
+        return try {
+            val process = ProcessBuilder("sh", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val code = process.waitFor()
+            ShellResult(code, output)
+        } catch (e: Exception) {
+            ShellResult(-1, e.message ?: "sh tidak bisa dijalankan")
+        }
+    }
+
+    /** Memilih root atau shell biasa sesuai [root]. */
+    fun exec(command: String, root: Boolean): ShellResult = if (root) run(command) else sh(command)
+
     /** True jika perintah `su` diberi izin dan berjalan sebagai root (uid 0). */
     fun isGranted(): Boolean {
         val result = run("id -u")

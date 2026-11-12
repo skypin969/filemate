@@ -10,7 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
 /** Layar-layar aplikasi, berurutan dari awal sampai akhir. */
-enum class Screen { SPLASH, PERMISSION, MAIN, SETTINGS }
+enum class Screen { SPLASH, PERMISSION, MAIN, SETTINGS, APPS }
 
 /** Pengatur layar: memilih layar mana yang tampil. */
 @Composable
@@ -19,9 +19,18 @@ fun FilemateApp() {
     // Editor teks atau hex tampil menutupi layar utama. Tidak ikut tersimpan jika aplikasi ditutup paksa.
     var editor by remember { mutableStateOf<EditorTarget?>(null) }
 
+    // Terminal juga tampil menutupi layar utama
+    var terminal by remember { mutableStateOf<TerminalTarget?>(null) }
+
     val open = editor
     if (open != null) {
         EditorScreen(target = open, onBack = { editor = null })
+        return
+    }
+
+    val shell = terminal
+    if (shell != null) {
+        TerminalScreen(target = shell, onBack = { terminal = null })
         return
     }
 
@@ -39,7 +48,11 @@ fun FilemateApp() {
         Screen.MAIN -> MainScreen(
             onOpenSettings = { screen = Screen.SETTINGS },
             onOpenEditor = { editor = it },
+            onOpenTerminal = { terminal = it },
+            onOpenApps = { screen = Screen.APPS },
         )
+
+        Screen.APPS -> AppManagerScreen(onBack = { screen = Screen.MAIN })
 
         Screen.SETTINGS -> {
             BackHandler { screen = Screen.MAIN }
