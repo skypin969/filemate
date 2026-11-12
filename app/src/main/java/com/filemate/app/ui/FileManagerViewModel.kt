@@ -217,6 +217,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setDual(enabled: Boolean) {
         _state.update { it.copy(dual = enabled) }
+        // Muat ulang kedua panel, supaya panel yang gagal dimuat saat aplikasi dibuka bisa dipakai lagi
+        if (enabled) reloadAll()
     }
 
     fun setRootMode(enabled: Boolean) {
