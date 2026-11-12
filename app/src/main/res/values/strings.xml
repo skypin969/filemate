@@ -63,6 +63,13 @@
     <string name="menu_bookmark">Tambah ke bookmark</string>
     <string name="menu_exit">Keluar</string>
     <string name="menu_select">Pilih</string>
+    <string name="menu_copy_other">Salin ke panel sebelah</string>
+    <string name="menu_move_other">Pindah ke panel sebelah</string>
+    <string name="menu_compress">Kompres ke ZIP</string>
+    <string name="menu_extract">Ekstrak ZIP</string>
+    <string name="menu_attributes">Atribut</string>
+    <string name="menu_share">Bagikan</string>
+    <string name="menu_open_with">Buka dengan</string>
     <string name="dialog_filter_title">Filter jenis berkas</string>
     <string name="filter_all">Semua</string>
     <string name="filter_folder">Folder</string>
@@ -102,6 +109,18 @@
     <string name="msg_cannot_open">File ini tidak bisa dibuka.</string>
     <string name="msg_bookmark_added">Ditambahkan ke bookmark.</string>
     <string name="msg_bookmark_exists">Folder ini sudah ada di bookmark.</string>
+    <string name="msg_compressed">Berhasil dikompres: %1$s</string>
+    <string name="msg_compress_failed">Gagal mengompres. Coba lagi.</string>
+    <string name="msg_extracted">Berhasil diekstrak ke: %1$s</string>
+    <string name="msg_extract_failed">Gagal mengekstrak ZIP. Berkas mungkin rusak.</string>
+    <string name="dialog_attributes_title">Atribut</string>
+    <string name="attr_name">Nama</string>
+    <string name="attr_location">Lokasi</string>
+    <string name="attr_type">Jenis</string>
+    <string name="attr_type_folder">Folder</string>
+    <string name="attr_type_file">Berkas</string>
+    <string name="attr_size">Ukuran</string>
+    <string name="attr_modified">Terakhir diubah</string>
 
     <!-- Alat APK -->
     <string name="apk_intro">Bongkar: isi APK dibuka ke folder Filemate. Rakit ulang: folder hasil bongkar dikemas lagi jadi APK baru. Tanda tangan: APK diberi tanda tangan supaya bisa dipasang.</string>

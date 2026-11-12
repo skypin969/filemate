@@ -1,5 +1,6 @@
 package com.filemate.app.ui
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.webkit.MimeTypeMap
@@ -34,17 +35,51 @@ fun formatDate(millis: Long): String {
     return SimpleDateFormat("yy-MM-dd HH:mm", Locale.US).format(Date(millis))
 }
 
+/** Jenis MIME dari akhiran berkas, dipakai saat membuka atau membagikan. */
+private fun mimeOf(item: FileItem): String =
+    MimeTypeMap.getSingleton().getMimeTypeFromExtension(item.extension.lowercase()) ?: "*/*"
+
+/** Alamat aman untuk aplikasi lain, lewat FileProvider. */
+private fun uriOf(context: Context, item: FileItem) =
+    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(item.path))
+
 /** Membuka berkas dengan aplikasi lain yang cocok di HP. */
 fun openFile(context: Context, item: FileItem) {
     try {
-        val file = File(item.path)
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val mime = MimeTypeMap.getSingleton()
-            .getMimeTypeFromExtension(item.extension.lowercase()) ?: "*/*"
+        val uri = uriOf(context, item)
         val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, mime)
+            .setDataAndType(uri, mimeOf(item))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Mengirim berkas lewat aplikasi lain (WhatsApp, Gmail, Bluetooth, dan lainnya). */
+fun shareFile(context: Context, item: FileItem) {
+    try {
+        val uri = uriOf(context, item)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType(mimeOf(item))
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .setClipData(ClipData.newRawUri("", uri))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(send, context.getString(R.string.menu_share)))
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Memilih aplikasi yang akan dipakai untuk membuka berkas ini. */
+fun openWith(context: Context, item: FileItem) {
+    try {
+        val uri = uriOf(context, item)
+        val view = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, mimeOf(item))
+            .setClipData(ClipData.newRawUri("", uri))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(view, context.getString(R.string.menu_open_with)))
     } catch (e: Exception) {
         Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
     }

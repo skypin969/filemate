@@ -63,6 +63,13 @@
     <string name="menu_bookmark">Add to bookmarks</string>
     <string name="menu_exit">Exit</string>
     <string name="menu_select">Select</string>
+    <string name="menu_copy_other">Copy to other panel</string>
+    <string name="menu_move_other">Move to other panel</string>
+    <string name="menu_compress">Compress to ZIP</string>
+    <string name="menu_extract">Extract ZIP</string>
+    <string name="menu_attributes">Attributes</string>
+    <string name="menu_share">Share</string>
+    <string name="menu_open_with">Open with</string>
     <string name="dialog_filter_title">Filter by file type</string>
     <string name="filter_all">All</string>
     <string name="filter_folder">Folders</string>
@@ -102,6 +109,18 @@
     <string name="msg_cannot_open">This file cannot be opened.</string>
     <string name="msg_bookmark_added">Added to bookmarks.</string>
     <string name="msg_bookmark_exists">This folder is already in bookmarks.</string>
+    <string name="msg_compressed">Compressed: %1$s</string>
+    <string name="msg_compress_failed">Compression failed. Try again.</string>
+    <string name="msg_extracted">Extracted to: %1$s</string>
+    <string name="msg_extract_failed">Extraction failed. The file may be damaged.</string>
+    <string name="dialog_attributes_title">Attributes</string>
+    <string name="attr_name">Name</string>
+    <string name="attr_location">Location</string>
+    <string name="attr_type">Type</string>
+    <string name="attr_type_folder">Folder</string>
+    <string name="attr_type_file">File</string>
+    <string name="attr_size">Size</string>
+    <string name="attr_modified">Last modified</string>
 
     <!-- APK tools -->
     <string name="apk_intro">Unpack: the APK contents are extracted into a Filemate folder. Repack: the unpacked folder is packed back into a new APK. Sign: the APK gets a signature so it can be installed.</string>

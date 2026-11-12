@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.filemate.app.R
 import com.filemate.app.apk.ApkTools
+import com.filemate.app.data.Archive
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
@@ -54,6 +55,7 @@ sealed interface AppDialog {
     data class Rename(val path: String) : AppDialog
     data class Confirm(val action: FileAction, val system: Boolean) : AppDialog
     data class Apk(val path: String) : AppDialog
+    data class Attributes(val item: FileItem) : AppDialog
     data object TypeFilterPicker : AppDialog
 }
 
@@ -452,6 +454,19 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         clearSelection()
     }
 
+    /** Menyalin atau memindahkan berkas langsung ke folder panel sebelahnya (hanya mode dua panel). */
+    fun transferToOtherPanel(fromIndex: Int, paths: List<String>, move: Boolean) {
+        val s = _state.value
+        if (!s.dual || paths.isEmpty()) return
+        val dest = s.panels[1 - fromIndex].path
+        requestAction(FileAction.Paste(paths, move, dest))
+    }
+
+    /** Menyalin atau memindahkan berkas yang dipilih langsung ke panel sebelahnya. */
+    fun transferSelectionToOther(move: Boolean) {
+        transferToOtherPanel(_state.value.active, selectedPaths(), move)
+    }
+
     fun pasteHere() {
         val s = _state.value
         val clip = s.clip ?: return
@@ -474,7 +489,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { s ->
                 s.copy(
                     message = message,
-                    clip = if (action is FileAction.Paste && ok) null else s.clip,
+                    // Clip hanya dihapus jika yang ditempel memang isi clip, bukan transfer langsung ke panel sebelah
+                    clip = if (action is FileAction.Paste && ok && s.clip?.paths == action.sources) null else s.clip,
                 )
             }
             clearSelection()
@@ -534,6 +550,57 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun isValidName(name: String): Boolean =
         name.isNotBlank() && !name.contains('/') && name != "." && name != ".."
+
+    // ---------- Kompres dan ekstrak ZIP ----------
+
+    /** Mengompres berkas atau folder menjadi ZIP di folder yang sama. */
+    fun compressPath(path: String) {
+        val source = File(path)
+        val dir = source.parentFile ?: return
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                val dest = uniqueFile(dir, source.name, ".zip")
+                if (Archive.zip(source, dest)) {
+                    text(R.string.msg_compressed, dest.name)
+                } else {
+                    text(R.string.msg_compress_failed)
+                }
+            }
+            _state.update { it.copy(message = message) }
+            reloadAll()
+        }
+    }
+
+    /** Mengekstrak ZIP ke folder baru dengan nama yang sama, di folder yang sama. */
+    fun extractZip(path: String) {
+        val zip = File(path)
+        val dir = zip.parentFile ?: return
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                val target = uniqueFile(dir, zip.nameWithoutExtension, "")
+                if (Archive.unzip(zip, target)) {
+                    text(R.string.msg_extracted, target.name)
+                } else {
+                    // Hasil setengah jadi dibuang, supaya tidak ada folder kosong yang membingungkan
+                    target.deleteRecursively()
+                    text(R.string.msg_extract_failed)
+                }
+            }
+            _state.update { it.copy(message = message) }
+            reloadAll()
+        }
+    }
+
+    /** Nama yang belum dipakai di [dir]: "nama", lalu "nama (2)", "nama (3)", dan seterusnya. */
+    private fun uniqueFile(dir: File, base: String, ext: String): File {
+        var candidate = File(dir, base + ext)
+        var n = 2
+        while (candidate.exists()) {
+            candidate = File(dir, "$base ($n)$ext")
+            n++
+        }
+        return candidate
+    }
 
     // ---------- Alat APK ----------
 

@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
@@ -40,16 +42,20 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -213,6 +219,9 @@ fun MainScreen(
                         onClose = { vm.clearSelection() },
                         onCopy = { vm.setClipFromSelection(move = false) },
                         onMove = { vm.setClipFromSelection(move = true) },
+                        showOther = state.dual,
+                        onCopyOther = { vm.transferSelectionToOther(move = false) },
+                        onMoveOther = { vm.transferSelectionToOther(move = true) },
                         onRename = {
                             selectedItems.firstOrNull()?.let { vm.showDialog(AppDialog.Rename(it.path)) }
                         },
@@ -287,6 +296,9 @@ fun MainScreen(
                     vm.setClipPaths(listOf(item.path), move = true)
                 }
             },
+            showOther = state.dual,
+            onCopyOther = { closeMenu { vm.transferToOtherPanel(index, listOf(item.path), move = false) } },
+            onMoveOther = { closeMenu { vm.transferToOtherPanel(index, listOf(item.path), move = true) } },
             onRename = {
                 closeMenu {
                     vm.setActive(index)
@@ -299,6 +311,12 @@ fun MainScreen(
                     vm.deletePaths(listOf(item.path))
                 }
             },
+            onCompress = { closeMenu { vm.setActive(index); vm.compressPath(item.path) } },
+            onExtract = { closeMenu { vm.setActive(index); vm.extractZip(item.path) } },
+            onAttributes = { closeMenu { vm.showDialog(AppDialog.Attributes(item)) } },
+            onShare = { closeMenu { shareFile(context, item) } },
+            onOpenWith = { closeMenu { openWith(context, item) } },
+            onBookmark = { closeMenu { vm.addBookmark(item.path) } },
             onApk = { closeMenu { vm.openApk(item.path) } },
         )
     }
@@ -339,6 +357,11 @@ fun MainScreen(
                 onDismiss = { vm.dismissApk() },
             )
         }
+
+        is AppDialog.Attributes -> AttributesDialog(
+            item = dialog.item,
+            onDismiss = { vm.dismissDialog() },
+        )
 
         AppDialog.TypeFilterPicker -> TypeFilterDialog(
             current = state.typeFilter,
@@ -552,6 +575,9 @@ private fun SelectionBar(
     onClose: () -> Unit,
     onCopy: () -> Unit,
     onMove: () -> Unit,
+    showOther: Boolean,
+    onCopyOther: () -> Unit,
+    onMoveOther: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onApk: () -> Unit,
@@ -590,6 +616,10 @@ private fun SelectionBar(
             }
             ActionText(stringResource(R.string.btn_copy), Blue700, onCopy)
             ActionText(stringResource(R.string.btn_move), Blue700, onMove)
+            if (showOther) {
+                ActionText(stringResource(R.string.menu_copy_other), Blue700, onCopyOther)
+                ActionText(stringResource(R.string.menu_move_other), Blue700, onMoveOther)
+            }
             if (showRename) {
                 ActionText(stringResource(R.string.btn_rename), Blue700, onRename)
             }
@@ -694,29 +724,58 @@ private fun ItemSheet(
     onSelect: () -> Unit,
     onCopy: () -> Unit,
     onMove: () -> Unit,
+    showOther: Boolean,
+    onCopyOther: () -> Unit,
+    onMoveOther: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onCompress: () -> Unit,
+    onExtract: () -> Unit,
+    onAttributes: () -> Unit,
+    onShare: () -> Unit,
+    onOpenWith: () -> Unit,
+    onBookmark: () -> Unit,
     onApk: () -> Unit,
 ) {
+    val isZip = !item.isDir && item.extension.equals("zip", ignoreCase = true)
+
+    // Lembar bisa digulir, karena menunya sekarang cukup panjang
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(
-            text = item.name,
-            color = Ink,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-        SheetAction(stringResource(R.string.menu_select), Icons.Filled.Check, onSelect)
-        SheetAction(stringResource(R.string.btn_copy), Icons.Filled.ContentCopy, onCopy)
-        SheetAction(stringResource(R.string.btn_move), Icons.Filled.DriveFileMove, onMove)
-        SheetAction(stringResource(R.string.btn_rename), Icons.Filled.Edit, onRename)
-        SheetAction(stringResource(R.string.btn_delete), Icons.Filled.Delete, onDelete, color = Danger)
-        if (item.isApk) {
-            SheetAction(stringResource(R.string.btn_apk_tools), Icons.Filled.Build, onApk)
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Text(
+                text = item.name,
+                color = Ink,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            SheetAction(stringResource(R.string.menu_select), Icons.Filled.Check, onSelect)
+            if (showOther) {
+                SheetAction(stringResource(R.string.menu_copy_other), Icons.Filled.ContentCopy, onCopyOther)
+                SheetAction(stringResource(R.string.menu_move_other), Icons.Filled.DriveFileMove, onMoveOther)
+            }
+            SheetAction(stringResource(R.string.btn_copy), Icons.Filled.ContentCopy, onCopy)
+            SheetAction(stringResource(R.string.btn_move), Icons.Filled.DriveFileMove, onMove)
+            SheetAction(stringResource(R.string.btn_rename), Icons.Filled.Edit, onRename)
+            SheetAction(stringResource(R.string.btn_delete), Icons.Filled.Delete, onDelete, color = Danger)
+            SheetAction(stringResource(R.string.menu_compress), Icons.Filled.Archive, onCompress)
+            if (isZip) {
+                SheetAction(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, onExtract)
+            }
+            SheetAction(stringResource(R.string.menu_attributes), Icons.Filled.Info, onAttributes)
+            if (item.isDir) {
+                SheetAction(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, onBookmark)
+            } else {
+                SheetAction(stringResource(R.string.menu_share), Icons.Filled.Share, onShare)
+                SheetAction(stringResource(R.string.menu_open_with), Icons.Filled.OpenInNew, onOpenWith)
+            }
+            if (item.isApk) {
+                SheetAction(stringResource(R.string.btn_apk_tools), Icons.Filled.Build, onApk)
+            }
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -737,6 +796,44 @@ private fun SheetAction(
         Icon(imageVector = icon, contentDescription = null, tint = color)
         Spacer(Modifier.width(16.dp))
         Text(text = label, color = color, fontSize = 15.sp)
+    }
+}
+
+/** Atribut berkas atau folder: nama, lokasi, jenis, ukuran, dan waktu terakhir diubah. */
+@Composable
+private fun AttributesDialog(
+    item: FileItem,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_attributes_title)) },
+        text = {
+            Column {
+                AttrRow(stringResource(R.string.attr_name), item.name)
+                AttrRow(stringResource(R.string.attr_location), FileRepository.parentOf(item.path))
+                AttrRow(
+                    label = stringResource(R.string.attr_type),
+                    value = stringResource(if (item.isDir) R.string.attr_type_folder else R.string.attr_type_file),
+                )
+                // Ukuran folder tidak dihitung, karena bisa lama jika isinya banyak
+                AttrRow(stringResource(R.string.attr_size), if (item.isDir) "-" else formatSize(item.size))
+                AttrRow(stringResource(R.string.attr_modified), formatDate(item.modified))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_close))
+            }
+        },
+    )
+}
+
+@Composable
+private fun AttrRow(label: String, value: String) {
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Text(text = label, color = Muted, fontSize = 12.sp)
+        Text(text = value, color = Ink, fontSize = 14.sp)
     }
 }
 
