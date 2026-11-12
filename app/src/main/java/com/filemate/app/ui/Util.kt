@@ -62,7 +62,7 @@ fun openFile(context: Context, item: FileItem) {
     }
 }
 
-/** Membuka berkas dengan aplikasi lain, dengan jenis yang ditentukan (misalnya "image/*" untuk penampil gambar). */
+/** Membuka berkas dengan aplikasi lain, dengan jenis MIME yang ditentukan (misalnya jenis gambar untuk penampil gambar). */
 fun openFileAs(context: Context, item: FileItem, mime: String) {
     try {
         val uri = uriOf(context, item)
