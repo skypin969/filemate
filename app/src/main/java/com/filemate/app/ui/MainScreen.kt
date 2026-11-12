@@ -1,9 +1,11 @@
 package com.filemate.app.ui
 
 import android.app.Activity
+import android.os.StatFs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,38 +16,60 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewColumn
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -89,6 +113,8 @@ fun MainScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbar = remember { SnackbarHostState() }
+    // Berkas yang sedang ditekan lama, beserta indeks panelnya. Null jika menu tidak tampil.
+    var menuTarget by remember { mutableStateOf<Pair<Int, FileItem>?>(null) }
 
     // Tombol kembali: tutup menu, lalu tutup pencarian/pilihan, lalu naik satu folder, lalu keluar
     BackHandler {
@@ -127,16 +153,24 @@ fun MainScreen(
         }
     }
 
+    // Menutup menu tekan lama, lalu menjalankan aksinya
+    fun closeMenu(action: () -> Unit) {
+        menuTarget = null
+        action()
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             DrawerSheet(
                 rootMode = state.rootMode,
+                bookmarks = state.bookmarks,
                 onGoto = { path ->
                     scope.launch { drawerState.close() }
                     vm.openFolder(state.active, path)
                 },
                 onRootChange = { vm.setRootMode(it) },
+                onRemoveBookmark = { vm.removeBookmark(it) },
                 onSettings = {
                     scope.launch { drawerState.close() }
                     onOpenSettings()
@@ -149,9 +183,18 @@ fun MainScreen(
                 TopBar(
                     path = active.path,
                     dual = state.dual,
+                    showHidden = state.showHidden,
+                    sort = state.sort,
                     onMenu = { scope.launch { drawerState.open() } },
                     onToggleDual = { vm.setDual(!state.dual) },
-                    onSearch = { vm.toggleSearch(!state.searchOpen) },
+                    onSearch = { vm.toggleSearch(true) },
+                    onSelectAll = { vm.selectAll(state.active) },
+                    onSort = { vm.setSort(it) },
+                    onFilter = { vm.showDialog(AppDialog.TypeFilterPicker) },
+                    onToggleHidden = { vm.toggleHidden() },
+                    onBookmark = { vm.addBookmark(active.path) },
+                    onSettings = onOpenSettings,
+                    onExit = { (context as? Activity)?.finish() },
                 )
 
                 if (state.searchOpen) {
@@ -184,23 +227,36 @@ fun MainScreen(
                     val shown = if (state.dual) listOf(0, 1) else listOf(state.active)
                     shown.forEachIndexed { k, index ->
                         if (k > 0) VerticalDivider(color = LineColor)
+                        val panel = state.panels[index]
+                        val parent = vm.parentFolder(panel.path)
                         FilePanel(
-                            panel = state.panels[index],
+                            panel = panel,
+                            visible = visibleItems(panel.items, state.search, state.showHidden, state.typeFilter),
                             isActive = state.active == index,
-                            search = state.search,
+                            parentPath = if (state.search.isBlank()) parent else null,
                             onActivate = { vm.setActive(index) },
+                            onOpenParent = { parent?.let { vm.openFolder(index, it) } },
                             onTap = { item -> tapItem(index, item) },
-                            onLongPress = { item -> vm.toggleSelect(index, item.path) },
+                            onLongPress = { item -> menuTarget = index to item },
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
 
-                BottomBar(
-                    clipCount = state.clip?.paths?.size,
-                    onNewFolder = { vm.showDialog(AppDialog.NewFolder(active.path)) },
-                    onSort = { vm.setSort(it) },
+                PasteBar(
+                    count = state.clip?.paths?.size,
                     onPaste = { vm.pasteHere() },
+                )
+
+                BottomBar(
+                    canBack = active.back.isNotEmpty(),
+                    canForward = active.forward.isNotEmpty(),
+                    canSwap = state.dual,
+                    onBack = { vm.historyBack(state.active) },
+                    onForward = { vm.historyForward(state.active) },
+                    onAdd = { vm.showDialog(AppDialog.NewFolder(active.path)) },
+                    onSwap = { vm.swapPanels() },
+                    onRefresh = { vm.reloadAll() },
                 )
             }
 
@@ -208,9 +264,43 @@ fun MainScreen(
                 hostState = snackbar,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 88.dp),
+                    .padding(bottom = 130.dp),
             )
         }
+    }
+
+    // Menu tekan lama pada satu berkas
+    menuTarget?.let { (index, item) ->
+        ItemSheet(
+            item = item,
+            onDismiss = { menuTarget = null },
+            onSelect = { closeMenu { vm.toggleSelect(index, item.path) } },
+            onCopy = {
+                closeMenu {
+                    vm.setActive(index)
+                    vm.setClipPaths(listOf(item.path), move = false)
+                }
+            },
+            onMove = {
+                closeMenu {
+                    vm.setActive(index)
+                    vm.setClipPaths(listOf(item.path), move = true)
+                }
+            },
+            onRename = {
+                closeMenu {
+                    vm.setActive(index)
+                    vm.showDialog(AppDialog.Rename(item.path))
+                }
+            },
+            onDelete = {
+                closeMenu {
+                    vm.setActive(index)
+                    vm.deletePaths(listOf(item.path))
+                }
+            },
+            onApk = { closeMenu { vm.openApk(item.path) } },
+        )
     }
 
     // Dialog yang sedang aktif
@@ -250,6 +340,15 @@ fun MainScreen(
             )
         }
 
+        AppDialog.TypeFilterPicker -> TypeFilterDialog(
+            current = state.typeFilter,
+            onPick = {
+                vm.setTypeFilter(it)
+                vm.dismissDialog()
+            },
+            onDismiss = { vm.dismissDialog() },
+        )
+
         null -> Unit
     }
 }
@@ -258,10 +357,21 @@ fun MainScreen(
 private fun TopBar(
     path: String,
     dual: Boolean,
+    showHidden: Boolean,
+    sort: SortMode,
     onMenu: () -> Unit,
     onToggleDual: () -> Unit,
     onSearch: () -> Unit,
+    onSelectAll: () -> Unit,
+    onSort: (SortMode) -> Unit,
+    onFilter: () -> Unit,
+    onToggleHidden: () -> Unit,
+    onBookmark: () -> Unit,
+    onSettings: () -> Unit,
+    onExit: () -> Unit,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -313,14 +423,100 @@ private fun TopBar(
             }
         }
 
-        IconButton(onClick = onSearch) {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = stringResource(R.string.cd_search),
-                tint = Color.White,
-            )
+        // Menu titik tiga: cari, urutkan, filter, bookmark, pengaturan, keluar
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(
+                    imageVector = Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.cd_more),
+                    tint = Color.White,
+                )
+            }
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+            ) {
+                OverflowItem(stringResource(R.string.menu_search), Icons.Filled.Search) {
+                    menuOpen = false
+                    onSearch()
+                }
+                OverflowItem(stringResource(R.string.menu_select_all), Icons.Filled.SelectAll) {
+                    menuOpen = false
+                    onSelectAll()
+                }
+                HorizontalDivider()
+                OverflowItem(
+                    label = stringResource(R.string.menu_sort_name),
+                    icon = Icons.Filled.Sort,
+                    checked = sort == SortMode.NAME,
+                ) {
+                    menuOpen = false
+                    onSort(SortMode.NAME)
+                }
+                OverflowItem(
+                    label = stringResource(R.string.menu_sort_size),
+                    icon = Icons.Filled.Sort,
+                    checked = sort == SortMode.SIZE,
+                ) {
+                    menuOpen = false
+                    onSort(SortMode.SIZE)
+                }
+                OverflowItem(
+                    label = stringResource(R.string.menu_sort_date),
+                    icon = Icons.Filled.Sort,
+                    checked = sort == SortMode.DATE,
+                ) {
+                    menuOpen = false
+                    onSort(SortMode.DATE)
+                }
+                HorizontalDivider()
+                OverflowItem(stringResource(R.string.menu_filter), Icons.Filled.FilterList) {
+                    menuOpen = false
+                    onFilter()
+                }
+                OverflowItem(
+                    label = stringResource(R.string.menu_show_hidden),
+                    icon = Icons.Filled.Visibility,
+                    checked = showHidden,
+                ) {
+                    menuOpen = false
+                    onToggleHidden()
+                }
+                HorizontalDivider()
+                OverflowItem(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark) {
+                    menuOpen = false
+                    onBookmark()
+                }
+                OverflowItem(stringResource(R.string.drawer_settings), Icons.Filled.Settings) {
+                    menuOpen = false
+                    onSettings()
+                }
+                OverflowItem(stringResource(R.string.menu_exit), Icons.Filled.ExitToApp) {
+                    menuOpen = false
+                    onExit()
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun OverflowItem(
+    label: String,
+    icon: ImageVector,
+    checked: Boolean = false,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        onClick = onClick,
+        leadingIcon = { Icon(imageVector = icon, contentDescription = null) },
+        trailingIcon = {
+            if (checked) {
+                Icon(imageVector = Icons.Filled.Check, contentDescription = null, tint = Blue700)
+            }
+        },
+    )
 }
 
 @Composable
@@ -418,97 +614,185 @@ private fun ActionText(label: String, color: Color, onClick: () -> Unit) {
     }
 }
 
+/** Tombol "Tempel" di atas bilah bawah. Hanya tampil jika ada berkas yang disalin atau dipotong. */
 @Composable
-private fun BottomBar(
-    clipCount: Int?,
-    onNewFolder: () -> Unit,
-    onSort: (SortMode) -> Unit,
-    onPaste: () -> Unit,
-) {
-    var sortMenuOpen by remember { mutableStateOf(false) }
-
-    Row(
+private fun PasteBar(count: Int?, onPaste: () -> Unit) {
+    if (count == null) return
+    Button(
+        onClick = onPaste,
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Blue700),
     ) {
-        OutlinedButton(
-            onClick = onNewFolder,
+        Text(stringResource(R.string.btn_paste, count), fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Bilah bawah: kembali, maju, tambah folder, tukar panel, muat ulang. */
+@Composable
+private fun BottomBar(
+    canBack: Boolean,
+    canForward: Boolean,
+    canSwap: Boolean,
+    onBack: () -> Unit,
+    onForward: () -> Unit,
+    onAdd: () -> Unit,
+    onSwap: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+    ) {
+        HorizontalDivider(color = LineColor)
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(44.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Blue700),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Blue700),
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.btn_new_folder), fontWeight = FontWeight.SemiBold)
-        }
-
-        Box(modifier = Modifier.weight(1f)) {
-            OutlinedButton(
-                onClick = { sortMenuOpen = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Blue200),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
-            ) {
-                Text(stringResource(R.string.btn_sort), fontWeight = FontWeight.SemiBold)
-            }
-            DropdownMenu(
-                expanded = sortMenuOpen,
-                onDismissRequest = { sortMenuOpen = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.sort_name)) },
-                    onClick = {
-                        onSort(SortMode.NAME)
-                        sortMenuOpen = false
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.sort_size)) },
-                    onClick = {
-                        onSort(SortMode.SIZE)
-                        sortMenuOpen = false
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.sort_date)) },
-                    onClick = {
-                        onSort(SortMode.DATE)
-                        sortMenuOpen = false
-                    },
-                )
-            }
-        }
-
-        if (clipCount != null) {
-            Button(
-                onClick = onPaste,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Blue700),
-            ) {
-                Text(stringResource(R.string.btn_paste, clipCount), fontWeight = FontWeight.SemiBold)
-            }
+            BarButton(Icons.Filled.ArrowBack, stringResource(R.string.bar_back), canBack, onBack)
+            BarButton(Icons.Filled.ArrowForward, stringResource(R.string.bar_forward), canForward, onForward)
+            BarButton(Icons.Filled.Add, stringResource(R.string.bar_add), true, onAdd)
+            BarButton(Icons.Filled.SwapHoriz, stringResource(R.string.bar_swap), canSwap, onSwap)
+            BarButton(Icons.Filled.Refresh, stringResource(R.string.bar_refresh), true, onRefresh)
         }
     }
 }
 
 @Composable
+private fun BarButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (enabled) Blue700 else Muted.copy(alpha = 0.4f)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = onClick, enabled = enabled) {
+            Icon(imageVector = icon, contentDescription = label, tint = tint)
+        }
+        Text(
+            text = label,
+            color = if (enabled) Ink else tint,
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Lembar bawah saat berkas ditekan lama. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ItemSheet(
+    item: FileItem,
+    onDismiss: () -> Unit,
+    onSelect: () -> Unit,
+    onCopy: () -> Unit,
+    onMove: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onApk: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            text = item.name,
+            color = Ink,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        SheetAction(stringResource(R.string.menu_select), Icons.Filled.Check, onSelect)
+        SheetAction(stringResource(R.string.btn_copy), Icons.Filled.ContentCopy, onCopy)
+        SheetAction(stringResource(R.string.btn_move), Icons.Filled.DriveFileMove, onMove)
+        SheetAction(stringResource(R.string.btn_rename), Icons.Filled.Edit, onRename)
+        SheetAction(stringResource(R.string.btn_delete), Icons.Filled.Delete, onDelete, color = Danger)
+        if (item.isApk) {
+            SheetAction(stringResource(R.string.btn_apk_tools), Icons.Filled.Build, onApk)
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SheetAction(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    color: Color = Ink,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = color)
+        Spacer(Modifier.width(16.dp))
+        Text(text = label, color = color, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun TypeFilterDialog(
+    current: TypeFilter,
+    onPick: (TypeFilter) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_filter_title)) },
+        text = {
+            Column {
+                TypeFilter.entries.forEach { filter ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(filter) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = filter == current, onClick = { onPick(filter) })
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(filterLabelRes(filter)), fontSize = 15.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_close))
+            }
+        },
+    )
+}
+
+private fun filterLabelRes(filter: TypeFilter): Int = when (filter) {
+    TypeFilter.ALL -> R.string.filter_all
+    TypeFilter.FOLDER -> R.string.filter_folder
+    TypeFilter.APK -> R.string.filter_apk
+    TypeFilter.MEDIA -> R.string.filter_media
+    TypeFilter.DOCUMENT -> R.string.filter_document
+}
+
+@Composable
 private fun DrawerSheet(
     rootMode: Boolean,
+    bookmarks: List<String>,
     onGoto: (String) -> Unit,
     onRootChange: (Boolean) -> Unit,
+    onRemoveBookmark: (String) -> Unit,
     onSettings: () -> Unit,
 ) {
+    val storageLabel = stringResource(R.string.title_storage)
+
     ModalDrawerSheet {
         Text(
             text = stringResource(R.string.app_name),
@@ -517,6 +801,8 @@ private fun DrawerSheet(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 28.dp, top = 24.dp, bottom = 12.dp),
         )
+
+        StorageInfo()
 
         DrawerItem(stringResource(R.string.drawer_storage), Icons.Filled.Storage) {
             onGoto(FileRepository.STORAGE_ROOT)
@@ -529,6 +815,58 @@ private fun DrawerSheet(
         }
         DrawerItem(stringResource(R.string.drawer_dcim), Icons.Filled.CameraAlt) {
             onGoto(FileRepository.STORAGE_ROOT + "/DCIM")
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = LineColor)
+
+        Text(
+            text = stringResource(R.string.drawer_bookmarks),
+            color = Muted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
+        )
+        if (bookmarks.isEmpty()) {
+            Text(
+                text = stringResource(R.string.drawer_bookmarks_empty),
+                color = Muted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 28.dp, end = 16.dp, bottom = 8.dp),
+            )
+        }
+        bookmarks.forEach { path ->
+            NavigationDrawerItem(
+                label = {
+                    Column {
+                        Text(
+                            text = folderTitle(path, storageLabel),
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = path,
+                            color = Muted,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                selected = false,
+                onClick = { onGoto(path) },
+                icon = { Icon(imageVector = Icons.Filled.Bookmark, contentDescription = null) },
+                badge = {
+                    IconButton(onClick = { onRemoveBookmark(path) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.cd_remove_bookmark),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                },
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+            )
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = LineColor)
@@ -566,6 +904,35 @@ private fun DrawerSheet(
 
         DrawerItem(stringResource(R.string.drawer_settings), Icons.Filled.Settings, onSettings)
     }
+}
+
+/** Batang kapasitas penyimpanan utama, dengan teks ringkas di atasnya. */
+@Composable
+private fun StorageInfo() {
+    val (total, free) = remember { storageBytes() }
+    val used = (total - free).coerceAtLeast(0L)
+    Column(modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp)) {
+        Text(
+            text = stringResource(R.string.drawer_storage_used, formatSize(used), formatSize(total)),
+            color = Ink,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = { if (total > 0) used.toFloat() / total.toFloat() else 0f },
+            modifier = Modifier.fillMaxWidth(),
+            color = Blue700,
+            trackColor = Blue100,
+        )
+    }
+}
+
+/** Kapasitas dan sisa ruang penyimpanan utama, dalam byte. */
+private fun storageBytes(): Pair<Long, Long> = try {
+    val stat = StatFs(FileRepository.STORAGE_ROOT)
+    Pair(stat.totalBytes, stat.availableBytes)
+} catch (e: Exception) {
+    Pair(0L, 0L)
 }
 
 @Composable

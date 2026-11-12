@@ -1,6 +1,7 @@
 package com.filemate.app.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.filemate.app.R
@@ -19,13 +20,21 @@ import kotlinx.coroutines.withContext
 
 enum class SortMode { NAME, SIZE, DATE }
 
-/** Keadaan satu panel: folder yang dibuka, isinya, dan item yang dipilih. */
+/** Filter jenis berkas yang tampil di panel. */
+enum class TypeFilter { ALL, FOLDER, APK, MEDIA, DOCUMENT }
+
+/**
+ * Keadaan satu panel: folder yang dibuka, isinya, item yang dipilih,
+ * dan riwayat folder untuk tombol kembali dan maju.
+ */
 data class PanelState(
     val path: String,
     val items: List<FileItem> = emptyList(),
     val loading: Boolean = false,
     val error: Boolean = false,
     val selected: Set<String> = emptySet(),
+    val back: List<String> = emptyList(),
+    val forward: List<String> = emptyList(),
 )
 
 /** Berkas yang sudah disalin atau dipotong, menunggu ditempel. */
@@ -45,6 +54,7 @@ sealed interface AppDialog {
     data class Rename(val path: String) : AppDialog
     data class Confirm(val action: FileAction, val system: Boolean) : AppDialog
     data class Apk(val path: String) : AppDialog
+    data object TypeFilterPicker : AppDialog
 }
 
 /** Keadaan dialog alat APK. */
@@ -66,15 +76,51 @@ data class UiState(
     val sort: SortMode = SortMode.NAME,
     val search: String = "",
     val searchOpen: Boolean = false,
+    val showHidden: Boolean = false,
+    val typeFilter: TypeFilter = TypeFilter.ALL,
+    val bookmarks: List<String> = emptyList(),
     val clip: Clip? = null,
     val dialog: AppDialog? = null,
     val apk: ApkInfo? = null,
     val message: String? = null,
 )
 
+private val MEDIA_EXT = setOf(
+    "JPG", "JPEG", "PNG", "GIF", "WEBP", "BMP", "HEIC",
+    "MP4", "MKV", "3GP", "WEBM", "MP3", "M4A", "WAV", "OGG", "FLAC",
+)
+
+private val DOCUMENT_EXT = setOf(
+    "PDF", "DOC", "DOCX", "TXT", "MD", "HTML", "HTM", "RTF", "ODT",
+    "XLS", "XLSX", "PPT", "PPTX", "CSV",
+)
+
+/**
+ * Berkas yang tampil di panel: sudah disaring pencarian, berkas tersembunyi,
+ * dan jenis berkas. Urutan tetap seperti di [items].
+ */
+fun visibleItems(
+    items: List<FileItem>,
+    search: String,
+    showHidden: Boolean,
+    typeFilter: TypeFilter,
+): List<FileItem> = items.filter { item ->
+    (showHidden || !item.name.startsWith(".")) &&
+        (search.isBlank() || item.name.contains(search, ignoreCase = true)) &&
+        when (typeFilter) {
+            TypeFilter.ALL -> true
+            TypeFilter.FOLDER -> item.isDir
+            TypeFilter.APK -> item.isApk
+            TypeFilter.MEDIA -> !item.isDir && item.extension in MEDIA_EXT
+            TypeFilter.DOCUMENT -> !item.isDir && item.extension in DOCUMENT_EXT
+        }
+}
+
 class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val _state = MutableStateFlow(UiState())
+    private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val _state = MutableStateFlow(UiState(bookmarks = loadBookmarks()))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
@@ -126,20 +172,75 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Membuka folder. Folder yang ditinggalkan masuk riwayat, supaya bisa kembali. */
     fun openFolder(index: Int, path: String) {
         _state.update { s ->
             s.copy(
                 active = index,
                 panels = s.panels.mapIndexed { i, p ->
-                    if (i == index) {
-                        p.copy(path = path, items = emptyList(), selected = emptySet())
-                    } else {
-                        p.copy(selected = emptySet())
+                    when {
+                        i != index -> p.copy(selected = emptySet())
+                        p.path == path -> p.copy(selected = emptySet())
+                        else -> p.copy(
+                            path = path,
+                            items = emptyList(),
+                            selected = emptySet(),
+                            back = (p.back + p.path).takeLast(MAX_HISTORY),
+                            forward = emptyList(),
+                        )
                     }
                 },
             )
         }
         loadPanel(index)
+    }
+
+    /** Tombol kembali di bilah bawah: pindah ke folder sebelumnya. */
+    fun historyBack(index: Int) {
+        val target = _state.value.panels[index].back.lastOrNull() ?: return
+        moveInHistory(index, target, goingBack = true)
+    }
+
+    /** Tombol maju di bilah bawah: kembali ke folder yang tadi ditinggalkan. */
+    fun historyForward(index: Int) {
+        val target = _state.value.panels[index].forward.lastOrNull() ?: return
+        moveInHistory(index, target, goingBack = false)
+    }
+
+    private fun moveInHistory(index: Int, target: String, goingBack: Boolean) {
+        _state.update { s ->
+            s.copy(
+                active = index,
+                panels = s.panels.mapIndexed { i, p ->
+                    when {
+                        i != index -> p.copy(selected = emptySet())
+                        goingBack -> p.copy(
+                            path = target,
+                            items = emptyList(),
+                            selected = emptySet(),
+                            back = p.back.dropLast(1),
+                            forward = (p.forward + p.path).takeLast(MAX_HISTORY),
+                        )
+                        else -> p.copy(
+                            path = target,
+                            items = emptyList(),
+                            selected = emptySet(),
+                            back = (p.back + p.path).takeLast(MAX_HISTORY),
+                            forward = p.forward.dropLast(1),
+                        )
+                    }
+                },
+            )
+        }
+        loadPanel(index)
+    }
+
+    /** Menukar isi dua panel. Hanya berlaku saat mode dua panel aktif. */
+    fun swapPanels() {
+        if (!_state.value.dual) return
+        _state.update { s -> s.copy(panels = s.panels.reversed(), active = 1 - s.active) }
+        // Muat ulang supaya status "sedang memuat" kedua panel tidak tertinggal
+        reloadAll()
     }
 
     /** Dipanggil tombol kembali. Mengembalikan false jika tidak ada yang bisa dilakukan. */
@@ -153,17 +254,16 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             clearSelection()
             return true
         }
-        val parent = parentPath(s.panels[s.active].path) ?: return false
+        val parent = parentFolder(s.panels[s.active].path) ?: return false
         openFolder(s.active, parent)
         return true
     }
 
-    private fun parentPath(path: String): String? {
+    /** Folder induk untuk baris "..". Null jika sudah di batas (tanpa root, batasnya penyimpanan pengguna). */
+    fun parentFolder(path: String): String? {
         if (path == "/" || path.isEmpty()) return null
-        val s = _state.value
         val parent = FileRepository.parentOf(path)
-        if (!s.rootMode) {
-            // Tanpa root, navigasi berhenti di penyimpanan pengguna
+        if (!_state.value.rootMode) {
             if (path == FileRepository.STORAGE_ROOT) return null
             if (!parent.startsWith(FileRepository.STORAGE_ROOT)) return null
         }
@@ -190,6 +290,23 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Memilih semua berkas yang sedang tampil di panel [index]. */
+    fun selectAll(index: Int) {
+        _state.update { s ->
+            s.copy(
+                active = index,
+                panels = s.panels.mapIndexed { i, p ->
+                    if (i == index) {
+                        val shown = visibleItems(p.items, s.search, s.showHidden, s.typeFilter)
+                        p.copy(selected = shown.map { it.path }.toSet())
+                    } else {
+                        p.copy(selected = emptySet())
+                    }
+                },
+            )
+        }
+    }
+
     fun clearSelection() {
         _state.update { s -> s.copy(panels = s.panels.map { it.copy(selected = emptySet()) }) }
     }
@@ -199,7 +316,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         return s.panels[s.active].selected.toList()
     }
 
-    // ---------- Cari, urutkan, mode ----------
+    // ---------- Cari, urutkan, filter, berkas tersembunyi ----------
 
     fun toggleSearch(open: Boolean) {
         _state.update { s -> s.copy(searchOpen = open, search = if (open) s.search else "") }
@@ -213,6 +330,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { s ->
             s.copy(sort = mode, panels = s.panels.map { it.copy(items = sortItems(it.items, mode)) })
         }
+    }
+
+    fun setTypeFilter(filter: TypeFilter) {
+        _state.update { it.copy(typeFilter = filter) }
+    }
+
+    fun toggleHidden() {
+        _state.update { it.copy(showHidden = !it.showHidden) }
     }
 
     fun setDual(enabled: Boolean) {
@@ -254,6 +379,32 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(message = null) }
     }
 
+    // ---------- Bookmark ----------
+
+    fun addBookmark(path: String) {
+        val current = _state.value.bookmarks
+        if (path in current) {
+            _state.update { it.copy(message = text(R.string.msg_bookmark_exists)) }
+            return
+        }
+        val updated = current + path
+        saveBookmarks(updated)
+        _state.update { it.copy(bookmarks = updated, message = text(R.string.msg_bookmark_added)) }
+    }
+
+    fun removeBookmark(path: String) {
+        val updated = _state.value.bookmarks - path
+        saveBookmarks(updated)
+        _state.update { it.copy(bookmarks = updated) }
+    }
+
+    private fun loadBookmarks(): List<String> =
+        prefs.getString(KEY_BOOKMARKS, "").orEmpty().lines().filter { it.isNotBlank() }
+
+    private fun saveBookmarks(list: List<String>) {
+        prefs.edit().putString(KEY_BOOKMARKS, list.joinToString("\n")).apply()
+    }
+
     // ---------- Dialog dan tindakan ----------
 
     fun showDialog(dialog: AppDialog) {
@@ -282,12 +433,19 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteSelected() {
-        val paths = selectedPaths()
+        deletePaths(selectedPaths())
+    }
+
+    /** Menghapus berkas tertentu (misalnya dari menu tekan lama). */
+    fun deletePaths(paths: List<String>) {
         if (paths.isNotEmpty()) requestAction(FileAction.Delete(paths))
     }
 
     fun setClipFromSelection(move: Boolean) {
-        val paths = selectedPaths()
+        setClipPaths(selectedPaths(), move)
+    }
+
+    fun setClipPaths(paths: List<String>, move: Boolean) {
         if (paths.isEmpty()) return
         _state.update { it.copy(clip = Clip(paths, move), message = text(R.string.msg_clip_ready)) }
         clearSelection()
@@ -502,5 +660,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val MAX_MANIFEST_CHARS = 20000
+        private const val MAX_HISTORY = 50
+        private const val PREFS_NAME = "filemate"
+        private const val KEY_BOOKMARKS = "bookmarks"
     }
 }

@@ -10,17 +10,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.item
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,23 +41,23 @@ import com.filemate.app.R
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 
-/** Satu panel berkas: judul folder di atas, lalu daftar isinya. */
+/**
+ * Satu panel berkas: judul folder, baris ".." (jika ada folder induk),
+ * lalu daftar isi yang sudah disaring. [visible] adalah hasil saringan dari ViewModel.
+ */
 @Composable
 fun FilePanel(
     panel: PanelState,
+    visible: List<FileItem>,
     isActive: Boolean,
-    search: String,
+    parentPath: String?,
     onActivate: () -> Unit,
+    onOpenParent: () -> Unit,
     onTap: (FileItem) -> Unit,
     onLongPress: (FileItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val folderName = FileRepository.nameOf(panel.path).ifEmpty { "/" }
-    val visible = if (search.isBlank()) {
-        panel.items
-    } else {
-        panel.items.filter { it.name.contains(search, ignoreCase = true) }
-    }
+    val title = folderTitle(panel.path, stringResource(R.string.title_storage))
 
     Column(modifier = modifier.fillMaxHeight()) {
         // Garis biru di atas judul menandakan panel yang sedang aktif
@@ -66,7 +68,7 @@ fun FilePanel(
                 .background(if (isActive) Blue700 else Color.Transparent),
         )
         Text(
-            text = folderName,
+            text = title,
             color = if (isActive) Ink else Muted,
             fontSize = 12.sp,
             maxLines = 1,
@@ -88,6 +90,16 @@ fun FilePanel(
         }
 
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (parentPath != null) {
+                item(key = "parent") {
+                    ParentRow(
+                        onClick = {
+                            onActivate()
+                            onOpenParent()
+                        },
+                    )
+                }
+            }
             items(visible, key = { it.path }) { item ->
                 FileRow(
                     item = item,
@@ -100,6 +112,43 @@ fun FilePanel(
                 )
             }
         }
+    }
+}
+
+/** Judul folder. Folder penyimpanan utama diberi nama biasa, bukan angka "0". */
+fun folderTitle(path: String, storageLabel: String): String = when (path) {
+    FileRepository.STORAGE_ROOT -> storageLabel
+    "/" -> "/"
+    else -> FileRepository.nameOf(path).ifEmpty { "/" }
+}
+
+/** Baris ".." di paling atas daftar: naik satu folder. */
+@Composable
+private fun ParentRow(onClick: () -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowUp,
+                contentDescription = null,
+                tint = FolderTint,
+                modifier = Modifier.size(26.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "..",
+                color = Ink,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        HorizontalDivider(color = LineColor)
     }
 }
 

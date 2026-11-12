@@ -23,7 +23,7 @@
     <string name="title_root">Akses root</string>
     <string name="btn_dual">Dua panel</string>
     <string name="cd_menu">Buka menu</string>
-    <string name="cd_search">Cari berkas</string>
+    <string name="cd_more">Menu lainnya</string>
     <string name="cd_close">Tutup</string>
     <string name="search_hint">Cari berkas</string>
     <string name="selected_count">%1$d dipilih</string>
@@ -44,6 +44,31 @@
     <string name="sort_date">Tanggal</string>
     <string name="empty_folder">Folder kosong</string>
     <string name="error_open_folder">Folder tidak bisa dibuka. Pastikan izin akses sudah diberikan.</string>
+
+    <!-- Bilah bawah -->
+    <string name="bar_back">Kembali</string>
+    <string name="bar_forward">Maju</string>
+    <string name="bar_add">Tambah</string>
+    <string name="bar_swap">Tukar</string>
+    <string name="bar_refresh">Muat ulang</string>
+
+    <!-- Menu titik tiga -->
+    <string name="menu_search">Cari</string>
+    <string name="menu_select_all">Pilih semua</string>
+    <string name="menu_sort_name">Urutkan: Nama</string>
+    <string name="menu_sort_size">Urutkan: Ukuran</string>
+    <string name="menu_sort_date">Urutkan: Tanggal</string>
+    <string name="menu_filter">Filter jenis berkas</string>
+    <string name="menu_show_hidden">Tampilkan file tersembunyi</string>
+    <string name="menu_bookmark">Tambah ke bookmark</string>
+    <string name="menu_exit">Keluar</string>
+    <string name="menu_select">Pilih</string>
+    <string name="dialog_filter_title">Filter jenis berkas</string>
+    <string name="filter_all">Semua</string>
+    <string name="filter_folder">Folder</string>
+    <string name="filter_apk">APK</string>
+    <string name="filter_media">Gambar, video, musik</string>
+    <string name="filter_document">Dokumen</string>
 
     <!-- Dialog -->
     <string name="dialog_new_folder">Buat folder baru</string>
@@ -75,6 +100,8 @@
     <string name="msg_root_off">Mode root dimatikan.</string>
     <string name="msg_clip_ready">Buka folder tujuan, lalu tekan Tempel.</string>
     <string name="msg_cannot_open">File ini tidak bisa dibuka.</string>
+    <string name="msg_bookmark_added">Ditambahkan ke bookmark.</string>
+    <string name="msg_bookmark_exists">Folder ini sudah ada di bookmark.</string>
 
     <!-- Alat APK -->
     <string name="apk_intro">Bongkar: isi APK dibuka ke folder Filemate. Rakit ulang: folder hasil bongkar dikemas lagi jadi APK baru. Tanda tangan: APK diberi tanda tangan supaya bisa dipasang.</string>
@@ -103,9 +130,13 @@
 
     <!-- Menu samping -->
     <string name="drawer_storage">Penyimpanan internal</string>
+    <string name="drawer_storage_used">%1$s dari %2$s terpakai</string>
     <string name="drawer_download">Download</string>
     <string name="drawer_documents">Documents</string>
     <string name="drawer_dcim">DCIM</string>
+    <string name="drawer_bookmarks">Bookmark</string>
+    <string name="drawer_bookmarks_empty">Belum ada bookmark. Buka menu titik tiga, lalu pilih Tambah ke bookmark.</string>
+    <string name="cd_remove_bookmark">Hapus bookmark</string>
     <string name="drawer_root">Akses root</string>
     <string name="drawer_root_desc">Lihat folder sistem. Butuh HP yang sudah di-root.</string>
     <string name="drawer_settings">Pengaturan</string>

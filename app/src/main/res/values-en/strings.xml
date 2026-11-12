@@ -23,7 +23,7 @@
     <string name="title_root">Root access</string>
     <string name="btn_dual">Dual pane</string>
     <string name="cd_menu">Open menu</string>
-    <string name="cd_search">Search files</string>
+    <string name="cd_more">More options</string>
     <string name="cd_close">Close</string>
     <string name="search_hint">Search files</string>
     <string name="selected_count">%1$d selected</string>
@@ -44,6 +44,31 @@
     <string name="sort_date">Date</string>
     <string name="empty_folder">Empty folder</string>
     <string name="error_open_folder">This folder cannot be opened. Make sure access permission has been granted.</string>
+
+    <!-- Bottom bar -->
+    <string name="bar_back">Back</string>
+    <string name="bar_forward">Forward</string>
+    <string name="bar_add">Add</string>
+    <string name="bar_swap">Swap</string>
+    <string name="bar_refresh">Refresh</string>
+
+    <!-- Overflow menu -->
+    <string name="menu_search">Search</string>
+    <string name="menu_select_all">Select all</string>
+    <string name="menu_sort_name">Sort: Name</string>
+    <string name="menu_sort_size">Sort: Size</string>
+    <string name="menu_sort_date">Sort: Date</string>
+    <string name="menu_filter">Filter by file type</string>
+    <string name="menu_show_hidden">Show hidden files</string>
+    <string name="menu_bookmark">Add to bookmarks</string>
+    <string name="menu_exit">Exit</string>
+    <string name="menu_select">Select</string>
+    <string name="dialog_filter_title">Filter by file type</string>
+    <string name="filter_all">All</string>
+    <string name="filter_folder">Folders</string>
+    <string name="filter_apk">APK</string>
+    <string name="filter_media">Images, videos, music</string>
+    <string name="filter_document">Documents</string>
 
     <!-- Dialogs -->
     <string name="dialog_new_folder">Create new folder</string>
@@ -75,6 +100,8 @@
     <string name="msg_root_off">Root mode is off.</string>
     <string name="msg_clip_ready">Open the destination folder, then tap Paste.</string>
     <string name="msg_cannot_open">This file cannot be opened.</string>
+    <string name="msg_bookmark_added">Added to bookmarks.</string>
+    <string name="msg_bookmark_exists">This folder is already in bookmarks.</string>
 
     <!-- APK tools -->
     <string name="apk_intro">Unpack: the APK contents are extracted into a Filemate folder. Repack: the unpacked folder is packed back into a new APK. Sign: the APK gets a signature so it can be installed.</string>
@@ -103,9 +130,13 @@
 
     <!-- Navigation drawer -->
     <string name="drawer_storage">Internal storage</string>
+    <string name="drawer_storage_used">%1$s of %2$s used</string>
     <string name="drawer_download">Download</string>
     <string name="drawer_documents">Documents</string>
     <string name="drawer_dcim">DCIM</string>
+    <string name="drawer_bookmarks">Bookmarks</string>
+    <string name="drawer_bookmarks_empty">No bookmarks yet. Open the three-dot menu, then choose Add to bookmarks.</string>
+    <string name="cd_remove_bookmark">Remove bookmark</string>
     <string name="drawer_root">Root access</string>
     <string name="drawer_root_desc">View system folders. Requires a rooted phone.</string>
     <string name="drawer_settings">Settings</string>
