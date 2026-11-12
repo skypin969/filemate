@@ -66,12 +66,13 @@ data class ApkInfo(
 )
 
 data class UiState(
-    val dual: Boolean = false,
+    // Dua panel langsung aktif saat aplikasi dibuka, keduanya mulai dari penyimpanan utama
+    val dual: Boolean = true,
     val rootMode: Boolean = false,
     val active: Int = 0,
     val panels: List<PanelState> = listOf(
-        PanelState(FileRepository.STORAGE_ROOT + "/Download"),
-        PanelState(FileRepository.STORAGE_ROOT + "/Documents"),
+        PanelState(FileRepository.STORAGE_ROOT),
+        PanelState(FileRepository.STORAGE_ROOT),
     ),
     val sort: SortMode = SortMode.NAME,
     val search: String = "",
