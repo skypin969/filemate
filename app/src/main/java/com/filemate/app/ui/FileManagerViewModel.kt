@@ -356,11 +356,15 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                     rootMode = false,
                     message = text(R.string.msg_root_off),
                     panels = s.panels.map { p ->
-                        if (p.path.startsWith(FileRepository.STORAGE_ROOT)) {
-                            p
-                        } else {
-                            p.copy(path = FileRepository.STORAGE_ROOT, selected = emptySet())
-                        }
+                        val inStorage = p.path.startsWith(FileRepository.STORAGE_ROOT)
+                        p.copy(
+                            path = if (inStorage) p.path else FileRepository.STORAGE_ROOT,
+                            selected = if (inStorage) p.selected else emptySet(),
+                            // Riwayat yang berisi folder root (misalnya / atau /storage) dibuang,
+                            // karena folder itu tidak bisa dibuka tanpa akses root
+                            back = p.back.filter { it.startsWith(FileRepository.STORAGE_ROOT) },
+                            forward = p.forward.filter { it.startsWith(FileRepository.STORAGE_ROOT) },
+                        )
                     },
                 )
             }
