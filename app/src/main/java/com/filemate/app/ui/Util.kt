@@ -63,8 +63,9 @@ fun shareFile(context: Context, item: FileItem) {
         val send = Intent(Intent.ACTION_SEND)
             .setType(mimeOf(item))
             .putExtra(Intent.EXTRA_STREAM, uri)
-            .setClipData(ClipData.newRawUri("", uri))
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // setClipData tidak mengembalikan Intent, jadi dipisah. Ini membuat izin baca ikut ke pilihan aplikasi.
+        send.clipData = ClipData.newRawUri("", uri)
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(send, context.getString(R.string.menu_share)))
     } catch (e: Exception) {
         Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
@@ -77,8 +78,8 @@ fun openWith(context: Context, item: FileItem) {
         val uri = uriOf(context, item)
         val view = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, mimeOf(item))
-            .setClipData(ClipData.newRawUri("", uri))
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        view.clipData = ClipData.newRawUri("", uri)
+        view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(view, context.getString(R.string.menu_open_with)))
     } catch (e: Exception) {
         Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
