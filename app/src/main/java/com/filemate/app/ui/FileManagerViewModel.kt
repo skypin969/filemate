@@ -9,6 +9,7 @@ import com.filemate.app.data.Archive
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
+import com.filemate.app.data.Trash
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,10 +43,12 @@ data class Clip(val paths: List<String>, val move: Boolean)
 
 /** Tindakan yang mengubah berkas. */
 sealed interface FileAction {
-    data class Delete(val paths: List<String>) : FileAction
+    /** [toTrash] true berarti berkas dipindah ke Recycle Bin, bukan dihapus selamanya. */
+    data class Delete(val paths: List<String>, val toTrash: Boolean = false) : FileAction
     data class Paste(val sources: List<String>, val move: Boolean, val destDir: String) : FileAction
     data class Rename(val path: String, val newName: String) : FileAction
     data class NewFolder(val parentDir: String, val name: String) : FileAction
+    data class NewFile(val parentDir: String, val name: String) : FileAction
 }
 
 /** Dialog yang sedang tampil. */
@@ -312,10 +315,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     fun parentFolder(path: String): String? {
         if (path == "/" || path.isEmpty()) return null
         val parent = FileRepository.parentOf(path)
-        if (!_state.value.rootMode) {
-            if (path == FileRepository.STORAGE_ROOT) return null
-            if (!parent.startsWith(FileRepository.STORAGE_ROOT)) return null
-        }
+        // Tanpa root, naik paling jauh sampai /storage/emulated (isinya folder "0"), seperti NP Manager
+        if (!_state.value.rootMode && !parent.startsWith("/storage/emulated")) return null
         return parent
     }
 
@@ -531,6 +532,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             action.sources.any { FileRepository.isSystemPath(it) }
         is FileAction.Rename -> FileRepository.isSystemPath(action.path)
         is FileAction.NewFolder -> FileRepository.isSystemPath(action.parentDir)
+        is FileAction.NewFile -> FileRepository.isSystemPath(action.parentDir)
     }
 
     private fun execute(action: FileAction) {
@@ -552,9 +554,32 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     private fun runOperation(action: FileAction, root: Boolean): Pair<Boolean, String> {
         return when (action) {
             is FileAction.Delete -> {
-                val ok = FileRepository.delete(action.paths, root)
-                val msg = if (ok) text(R.string.msg_deleted, action.paths.size) else text(R.string.msg_failed)
+                // Recycle Bin hanya untuk berkas di penyimpanan internal. Selain itu dihapus selamanya.
+                val useTrash = action.toTrash && !root && action.paths.all { Trash.supports(it) }
+                val ok = if (useTrash) {
+                    action.paths.map { Trash.move(it) }.all { it }
+                } else {
+                    FileRepository.delete(action.paths, root)
+                }
+                val msg = when {
+                    !ok -> text(R.string.msg_failed)
+                    useTrash -> text(R.string.msg_trashed, action.paths.size)
+                    else -> text(R.string.msg_deleted, action.paths.size)
+                }
                 Pair(ok, msg)
+            }
+
+            is FileAction.NewFile -> {
+                val name = action.name.trim()
+                val target = FileRepository.join(action.parentDir, name)
+                when {
+                    !isValidName(name) -> Pair(false, text(R.string.msg_invalid_name))
+                    FileRepository.exists(target, root) -> Pair(false, text(R.string.msg_name_exists))
+                    else -> {
+                        val ok = FileRepository.createFile(action.parentDir, name, root)
+                        Pair(ok, text(if (ok) R.string.msg_file_created else R.string.msg_failed))
+                    }
+                }
             }
 
             is FileAction.Paste -> {

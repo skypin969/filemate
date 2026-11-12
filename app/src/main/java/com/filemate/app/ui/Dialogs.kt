@@ -1,5 +1,6 @@
 package com.filemate.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextField
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.filemate.app.R
+import com.filemate.app.data.FileItem
 import java.io.File
 
 /** Dialog berisi satu kolom isian, misalnya nama folder baru. */
@@ -82,38 +85,135 @@ fun InputDialog(
 }
 
 /**
- * Dialog konfirmasi. Untuk folder sistem, tombol baru aktif setelah user
- * mencentang bahwa dia paham risikonya.
+ * Dialog "Baru" dari tombol tambah, seperti NP Manager: satu kolom nama,
+ * lalu pilih mau dibuat sebagai berkas atau folder. Nama yang sudah dipakai langsung ditandai.
+ */
+@Composable
+fun NewItemDialog(
+    parentDir: String,
+    onCreateFile: (String) -> Unit,
+    onCreateFolder: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var value by remember { mutableStateOf("") }
+    val name = value.trim()
+    val exists = name.isNotEmpty() && File(parentDir, name).exists()
+    val usable = name.isNotEmpty() && !exists
+    val supporting: (@Composable () -> Unit)? = if (exists) {
+        { Text(stringResource(R.string.msg_name_exists), color = Danger) }
+    } else {
+        null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(stringResource(R.string.dialog_new_title), fontWeight = FontWeight.SemiBold) },
+        text = {
+            TextField(
+                value = value,
+                onValueChange = { value = it },
+                singleLine = true,
+                isError = exists,
+                supportingText = supporting,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    errorContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Accent,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            Row {
+                TextButton(onClick = { onCreateFile(name) }, enabled = usable) {
+                    Text(stringResource(R.string.btn_new_file), fontWeight = FontWeight.SemiBold)
+                }
+                TextButton(onClick = { onCreateFolder(name) }, enabled = usable) {
+                    Text(stringResource(R.string.btn_new_folder), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel), fontWeight = FontWeight.SemiBold)
+            }
+        },
+    )
+}
+
+/**
+ * Dialog konfirmasi. Untuk hapus, tampil nama dan ukuran berkas serta pilihan "Pindah ke Recycle Bin"
+ * seperti NP Manager. Untuk folder sistem, tombol baru aktif setelah user mencentang bahwa dia paham risikonya.
+ * [single] diisi jika yang dihapus hanya satu berkas. [trashAvailable] false jika berkas tidak bisa masuk Recycle Bin.
  */
 @Composable
 fun ConfirmDialog(
     action: FileAction,
     system: Boolean,
-    onConfirm: () -> Unit,
+    single: FileItem?,
+    trashAvailable: Boolean,
+    onConfirm: (FileAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val title = when (action) {
-        is FileAction.Delete -> stringResource(R.string.confirm_delete_title)
+        is FileAction.Delete -> stringResource(R.string.btn_delete)
         is FileAction.Paste -> stringResource(R.string.confirm_paste_title)
         is FileAction.Rename -> stringResource(R.string.confirm_rename_title)
         is FileAction.NewFolder -> stringResource(R.string.confirm_new_title)
+        is FileAction.NewFile -> stringResource(R.string.confirm_new_title)
     }
     val body = when (action) {
-        is FileAction.Delete -> stringResource(R.string.confirm_delete_body, action.paths.size)
+        is FileAction.Delete -> if (single != null) {
+            stringResource(R.string.confirm_delete_one, single.name)
+        } else {
+            stringResource(R.string.confirm_delete_many, action.paths.size)
+        }
         is FileAction.Paste -> stringResource(R.string.confirm_paste_body, action.sources.size)
         is FileAction.Rename -> stringResource(R.string.confirm_rename_body)
         is FileAction.NewFolder -> stringResource(R.string.confirm_new_body)
+        is FileAction.NewFile -> stringResource(R.string.confirm_new_body)
     }
-    val danger = action is FileAction.Delete
-    val confirmText = stringResource(if (danger) R.string.btn_delete else R.string.btn_continue)
+    val isDelete = action is FileAction.Delete
     var understood by remember { mutableStateOf(false) }
+    var toTrash by remember { mutableStateOf(trashAvailable) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        containerColor = Color.White,
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column {
                 Text(body, fontSize = 15.sp)
+                if (isDelete && single != null && !single.isDir) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.attr_size) + "  " + formatSize(single.size),
+                        color = Muted,
+                        fontSize = 14.sp,
+                    )
+                }
+                if (isDelete && trashAvailable) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { toTrash = !toTrash },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = toTrash,
+                            onCheckedChange = { toTrash = it },
+                            colors = CheckboxDefaults.colors(checkedColor = Accent),
+                        )
+                        Text(stringResource(R.string.delete_to_trash), fontSize = 14.sp)
+                    }
+                }
+                // Peringatan merah saat berkas akan dihapus selamanya
+                if (isDelete && !(trashAvailable && toTrash)) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(R.string.delete_forever_warning), color = Danger, fontSize = 14.sp)
+                }
                 if (system) {
                     Spacer(Modifier.height(12.dp))
                     Text(
@@ -131,19 +231,25 @@ fun ConfirmDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = {
+                    if (action is FileAction.Delete) {
+                        onConfirm(action.copy(toTrash = trashAvailable && toTrash))
+                    } else {
+                        onConfirm(action)
+                    }
+                },
                 enabled = !system || understood,
             ) {
                 Text(
-                    text = confirmText,
-                    color = if (danger) Danger else Accent,
+                    text = stringResource(R.string.btn_ok),
+                    color = Accent,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.btn_cancel))
+                Text(stringResource(R.string.btn_cancel), color = Accent, fontWeight = FontWeight.SemiBold)
             }
         },
     )

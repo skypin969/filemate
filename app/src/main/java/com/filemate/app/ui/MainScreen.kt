@@ -131,6 +131,7 @@ import com.filemate.app.R
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
+import com.filemate.app.data.Trash
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -144,6 +145,7 @@ fun MainScreen(
     onOpenEditor: (EditorTarget) -> Unit,
     onOpenTerminal: (TerminalTarget) -> Unit,
     onOpenApps: () -> Unit,
+    onOpenTrash: () -> Unit,
     vm: FileManagerViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -207,9 +209,14 @@ fun MainScreen(
                 vm.setActive(index)
                 vm.openApk(item.path)
             }
+            // Berkas teks langsung dibuka di editor. Jenis lain memunculkan pilihan "Buka dengan", seperti NP Manager.
+            item.extension in TEXT_EXT -> {
+                vm.setActive(index)
+                onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
+            }
             else -> {
                 vm.setActive(index)
-                openFile(context, item)
+                openWithTarget = item
             }
         }
     }
@@ -247,6 +254,10 @@ fun MainScreen(
                 onTerminal = {
                     scope.launch { drawerState.close() }
                     onOpenTerminal(TerminalTarget(active.path, command = null, root = state.rootMode))
+                },
+                onTrash = {
+                    scope.launch { drawerState.close() }
+                    onOpenTrash()
                 },
                 onNotReady = {
                     scope.launch { drawerState.close() }
@@ -394,21 +405,18 @@ fun MainScreen(
             onShare = { closeMenu { shareFile(context, item) } },
             onOpenWith = { closeMenu { openWithTarget = item } },
             onEditHex = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode)) } },
-            // "Alat": untuk APK membuka alat APK, untuk ZIP mengekstrak. Jenis lain belum punya alat.
+            // "Alat": untuk APK membuka alat APK. Jenis lain belum punya alat.
             onTools = {
                 closeMenu {
                     vm.setActive(index)
-                    when {
-                        item.isApk -> vm.openApk(item.path)
-                        item.extension == "ZIP" -> vm.extractZip(item.path)
-                        else -> vm.notify(notReady)
-                    }
+                    if (item.isApk) vm.openApk(item.path) else vm.notify(notReady)
                 }
             },
             onEditText = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode)) } },
             onBookmark = {
                 closeMenu { vm.addBookmark(if (item.isDir) item.path else FileRepository.parentOf(item.path)) }
             },
+            onExtract = { closeMenu { vm.setActive(index); vm.extractZip(item.path) } },
             onRunScript = {
                 closeMenu {
                     onOpenTerminal(
@@ -473,12 +481,10 @@ fun MainScreen(
 
     // Dialog yang sedang aktif
     when (val dialog = state.dialog) {
-        is AppDialog.NewFolder -> InputDialog(
-            title = stringResource(R.string.dialog_new_folder),
-            label = stringResource(R.string.label_folder_name),
-            initial = "",
-            confirmText = stringResource(R.string.btn_create),
-            onConfirm = { name -> vm.requestAction(FileAction.NewFolder(dialog.parentDir, name)) },
+        is AppDialog.NewFolder -> NewItemDialog(
+            parentDir = dialog.parentDir,
+            onCreateFile = { name -> vm.requestAction(FileAction.NewFile(dialog.parentDir, name)) },
+            onCreateFolder = { name -> vm.requestAction(FileAction.NewFolder(dialog.parentDir, name)) },
             onDismiss = { vm.dismissDialog() },
         )
 
@@ -491,12 +497,24 @@ fun MainScreen(
             onDismiss = { vm.dismissDialog() },
         )
 
-        is AppDialog.Confirm -> ConfirmDialog(
-            action = dialog.action,
-            system = dialog.system,
-            onConfirm = { vm.confirmAction(dialog.action) },
-            onDismiss = { vm.dismissDialog() },
-        )
+        is AppDialog.Confirm -> {
+            val action = dialog.action
+            val deletePaths = (action as? FileAction.Delete)?.paths.orEmpty()
+            // Jika yang dihapus hanya satu, nama dan ukurannya ditampilkan di dialog
+            val single = if (deletePaths.size == 1) {
+                state.panels.flatMap { it.items }.firstOrNull { it.path == deletePaths[0] }
+            } else {
+                null
+            }
+            ConfirmDialog(
+                action = action,
+                system = dialog.system,
+                single = single,
+                trashAvailable = !state.rootMode && deletePaths.isNotEmpty() && deletePaths.all { Trash.supports(it) },
+                onConfirm = { vm.confirmAction(it) },
+                onDismiss = { vm.dismissDialog() },
+            )
+        }
 
         is AppDialog.Apk -> state.apk?.let { info ->
             ApkDialog(
@@ -878,9 +896,11 @@ private fun ItemMenu(
     onTools: () -> Unit,
     onEditText: () -> Unit,
     onBookmark: () -> Unit,
+    onExtract: () -> Unit,
     onRunScript: () -> Unit,
 ) {
     val isFile = !item.isDir
+    val isZip = isFile && item.extension == "ZIP"
     val copyText = stringResource(R.string.btn_copy)
     val moveText = stringResource(R.string.btn_move)
     // Tanda panah menunjukkan arah panel tujuan
@@ -901,7 +921,14 @@ private fun ItemMenu(
         if (isFile) MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools) else null,
         if (isFile) MenuEntry(stringResource(R.string.menu_edit_text), Icons.Filled.Description, Ink, onEditText) else null,
         MenuEntry(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, Ink, onBookmark),
-        if (isFile) MenuEntry(stringResource(R.string.menu_run_script), Icons.Filled.Terminal, Ink, onRunScript) else null,
+        // Untuk ZIP, pilihan terakhir adalah mengekstrak, seperti NP Manager
+        if (isZip) {
+            MenuEntry(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, Ink, onExtract)
+        } else if (isFile) {
+            MenuEntry(stringResource(R.string.menu_run_script), Icons.Filled.Terminal, Ink, onRunScript)
+        } else {
+            null
+        },
     )
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1103,6 +1130,7 @@ private fun DrawerSheet(
     onSettings: () -> Unit,
     onApps: () -> Unit,
     onTerminal: () -> Unit,
+    onTrash: () -> Unit,
     onNotReady: () -> Unit,
 ) {
     val storageLabel = stringResource(R.string.title_storage)
@@ -1119,7 +1147,7 @@ private fun DrawerSheet(
         DrawerTool(R.string.tool_ftp, Icons.Filled.Cloud, null),
         DrawerTool(R.string.tool_http, Icons.Filled.Language, null),
         DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, null),
-        DrawerTool(R.string.tool_recycle, Icons.Filled.Delete, null),
+        DrawerTool(R.string.tool_recycle, Icons.Filled.Delete, onTrash),
         DrawerTool(R.string.tool_java2smali, Icons.Filled.Coffee, null),
         DrawerTool(R.string.tool_smali_query, Icons.Filled.Description, null),
         DrawerTool(R.string.tool_network, Icons.Filled.Public, null),

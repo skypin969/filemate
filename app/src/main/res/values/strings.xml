@@ -33,8 +33,6 @@
     <string name="btn_paste">Tempel (%1$d)</string>
     <string name="btn_cancel">Batal</string>
     <string name="btn_close">Tutup</string>
-    <string name="btn_create">Buat</string>
-    <string name="btn_continue">Lanjutkan</string>
     <string name="sort_name">Nama</string>
     <string name="sort_size">Ukuran</string>
     <string name="sort_date">Tanggal</string>
@@ -54,11 +52,10 @@
     <string name="menu_filter">Filter</string>
     <string name="menu_bookmark">Tambah bookmark</string>
     <string name="menu_exit">Keluar</string>
-    <string name="menu_select">Pilih</string>
     <string name="menu_copy_other">Salin ke panel sebelah</string>
     <string name="menu_move_other">Pindah ke panel sebelah</string>
     <string name="menu_compress">Kompres</string>
-    <string name="menu_extract">Ekstrak ZIP</string>
+    <string name="menu_extract">Ekstrak ke...</string>
     <string name="menu_attributes">Atribut</string>
     <string name="menu_share">Bagikan</string>
     <string name="menu_open_with">Buka dengan</string>
@@ -70,19 +67,14 @@
     <string name="filter_document">Dokumen</string>
 
     <!-- Dialog -->
-    <string name="dialog_new_folder">Buat folder baru</string>
-    <string name="label_folder_name">Nama folder</string>
     <string name="dialog_rename">Ubah nama</string>
     <string name="label_new_name">Nama baru</string>
-    <string name="confirm_delete_title">Hapus item?</string>
-    <string name="confirm_delete_body">Hapus %1$d item yang dipilih? Tindakan ini tidak bisa dibatalkan.</string>
     <string name="confirm_paste_title">Tempel di sini?</string>
     <string name="confirm_paste_body">Tempel %1$d item ke folder ini?</string>
     <string name="confirm_rename_title">Ubah nama?</string>
     <string name="confirm_rename_body">Ubah nama berkas ini?</string>
     <string name="confirm_new_title">Buat folder?</string>
     <string name="confirm_new_body">Buat folder baru di lokasi ini?</string>
-    <string name="confirm_generic_title">Lanjutkan?</string>
     <string name="warn_system">Ini folder sistem. Salah mengubah atau menghapus berkas di sini bisa membuat HP tidak bisa menyala.</string>
     <string name="warn_understand">Saya paham risikonya</string>
 
@@ -166,7 +158,6 @@
     <string name="drawer_bookmarks_empty">Belum ada bookmark. Tekan lama sebuah folder, lalu pilih Tambah bookmark.</string>
     <string name="cd_remove_bookmark">Hapus bookmark</string>
     <string name="drawer_root">Akses root</string>
-    <string name="drawer_root_desc">Lihat folder sistem. Butuh HP yang sudah di-root.</string>
     <string name="drawer_settings">Pengaturan</string>
     <!-- Tampilan gaya NP Manager -->
     <string name="top_info">folder: %1$d berkas: %2$d penyimpanan: %3$s/%4$s %5$s</string>
@@ -267,4 +258,16 @@
     <string name="settings_general_header">Umum</string>
     <string name="settings_backup_title">Buat file cadangan</string>
     <string name="settings_backup_desc">Saat menyimpan dari editor teks, isi lama disimpan dulu sebagai file cadangan .bak</string>
+    <string name="dialog_new_title">Baru</string>
+    <string name="btn_new_file">Berkas</string>
+    <string name="btn_new_folder">Folder</string>
+    <string name="msg_file_created">Berkas dibuat.</string>
+    <string name="msg_trashed">%1$d item dipindah ke Recycle Bin.</string>
+    <string name="confirm_delete_one">Hapus berkas %1$s ?</string>
+    <string name="confirm_delete_many">Hapus %1$d item yang dipilih?</string>
+    <string name="delete_to_trash">Pindah ke Recycle Bin</string>
+    <string name="delete_forever_warning">Berkas tidak dapat dipulihkan setelah dihapus</string>
+    <string name="trash_empty">Recycle Bin kosong.</string>
+    <string name="trash_restore">Pulihkan</string>
+    <string name="trash_delete_forever">Hapus permanen</string>
 </resources>

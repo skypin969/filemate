@@ -25,6 +25,14 @@ object FileRepository {
     // ---------- Membaca isi folder ----------
 
     fun listLocal(dir: String): Result<List<FileItem>> {
+        // Android tidak mengizinkan isi /storage/emulated dibaca, padahal isinya hanya folder "0"
+        // (penyimpanan internal). Folder itu ditampilkan langsung supaya bisa naik-turun seperti NP Manager.
+        if (dir == "/storage/emulated") {
+            val zero = File(STORAGE_ROOT)
+            return Result.success(
+                listOf(FileItem("0", STORAGE_ROOT, isDir = true, isLink = false, size = 0L, modified = zero.lastModified())),
+            )
+        }
         val children = File(dir).listFiles()
             ?: return Result.failure(IllegalStateException("Folder tidak bisa dibuka"))
         val items = children.map { f ->
@@ -94,6 +102,19 @@ object FileRepository {
             RootShell.run("mkdir ${RootShell.quote(join(parent, name))}").exitCode == 0
         } else {
             File(parent, name).mkdir()
+        }
+    }
+
+    /** Membuat berkas kosong. */
+    fun createFile(parent: String, name: String, root: Boolean): Boolean {
+        return if (root) {
+            RootShell.run("touch ${RootShell.quote(join(parent, name))}").exitCode == 0
+        } else {
+            try {
+                File(parent, name).createNewFile()
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 

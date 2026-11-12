@@ -10,7 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
 /** Layar-layar aplikasi, berurutan dari awal sampai akhir. */
-enum class Screen { SPLASH, PERMISSION, MAIN, SETTINGS, APPS }
+enum class Screen { SPLASH, PERMISSION, MAIN, SETTINGS, APPS, TRASH }
 
 /** Pengatur layar: memilih layar mana yang tampil. */
 @Composable
@@ -50,7 +50,10 @@ fun FilemateApp() {
             onOpenEditor = { editor = it },
             onOpenTerminal = { terminal = it },
             onOpenApps = { screen = Screen.APPS },
+            onOpenTrash = { screen = Screen.TRASH },
         )
+
+        Screen.TRASH -> TrashScreen(onBack = { screen = Screen.MAIN })
 
         Screen.APPS -> AppManagerScreen(onBack = { screen = Screen.MAIN })
 

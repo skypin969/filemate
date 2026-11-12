@@ -109,7 +109,7 @@ fun OpenWithDialog(
                 )
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 440.dp)
+                        .heightIn(max = 560.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
                     CHOICES.chunked(3).forEach { rowChoices ->

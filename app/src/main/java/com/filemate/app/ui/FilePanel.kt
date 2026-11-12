@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material3.Icon
@@ -156,6 +158,7 @@ private fun FileRow(
     onIconClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val recent = !item.isDir && System.currentTimeMillis() - item.modified in 0 until RECENT_MILLIS
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -173,7 +176,7 @@ private fun FileRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.name,
-                color = Ink,
+                color = if (recent) RecentGreen else Ink,
                 fontSize = 15.sp,
                 lineHeight = 18.sp,
                 maxLines = 3,
@@ -207,6 +210,21 @@ private fun FileIcon(item: FileItem) {
 
         item.isApk -> ApkIcon(item.path)
 
+        // Berkas teks: ikon papan catatan biru. Arsip: ikon merah. Seperti NP Manager.
+        item.extension in TEXT_EXT -> Icon(
+            imageVector = Icons.Filled.Assignment,
+            contentDescription = null,
+            tint = Color(0xFF3F51B5),
+            modifier = Modifier.size(30.dp),
+        )
+
+        item.extension in ARCHIVE_EXT -> Icon(
+            imageVector = Icons.Filled.Archive,
+            contentDescription = null,
+            tint = Color(0xFFC62828),
+            modifier = Modifier.size(30.dp),
+        )
+
         else -> Icon(
             imageVector = Icons.Filled.InsertDriveFile,
             contentDescription = null,
@@ -215,6 +233,18 @@ private fun FileIcon(item: FileItem) {
         )
     }
 }
+
+/** Akhiran berkas yang dianggap teks: dibuka langsung di editor teks dan diberi ikon biru. */
+val TEXT_EXT = setOf(
+    "TXT", "MD", "XML", "JSON", "HTML", "HTM", "CSS", "JS", "SH", "PROP", "CONF", "CFG", "INI", "LOG", "RC",
+    "JAVA", "KT", "KTS", "SMALI", "YML", "YAML", "CSV", "SVG", "PY", "C", "H", "CPP", "GRADLE", "PROPERTIES", "BAT",
+)
+
+private val ARCHIVE_EXT = setOf("ZIP", "RAR", "7Z", "TAR", "GZ", "TGZ", "XZ", "BZ2", "JAR", "APKS", "XAPK")
+
+/** Berkas yang baru dibuat atau diubah (30 menit terakhir) namanya berwarna hijau, seperti NP Manager. */
+private val RecentGreen = Color(0xFF2E9E4F)
+private const val RECENT_MILLIS = 30L * 60 * 1000
 
 // Ikon APK yang sudah pernah dimuat, supaya tidak dimuat ulang setiap daftar digulir
 private val apkIconCache = ConcurrentHashMap<String, ImageBitmap>()
