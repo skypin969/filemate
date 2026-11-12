@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Filemate</string>
+    <string name="cd_app_icon">Filemate icon</string>
+
+    <!-- Splash screen -->
+    <string name="splash_tagline">Manage files and unpack APKs on your phone</string>
+    <string name="splash_loading">Loading...</string>
+
+    <!-- Permission screen -->
+    <string name="perm_title">Allow access to all files</string>
+    <string name="perm_body">Filemate needs to read and change files in phone storage, including folders outside this app. Permission is granted in Android settings.</string>
+    <string name="perm_step_1">Tap the Open settings button below.</string>
+    <string name="perm_step_2">Turn on access to all files for Filemate.</string>
+    <string name="perm_step_3">Return to Filemate.</string>
+    <string name="perm_note">Without this permission, Filemate cannot open.</string>
+    <string name="perm_open_settings">Open settings</string>
+    <string name="perm_check_again">Check again</string>
+    <string name="perm_not_yet">Permission is not active yet. Turn it on in settings first.</string>
+
+    <!-- Main screen -->
+    <string name="title_storage">Internal storage</string>
+    <string name="title_root">Root access</string>
+    <string name="btn_dual">Dual pane</string>
+    <string name="cd_menu">Open menu</string>
+    <string name="cd_search">Search files</string>
+    <string name="cd_close">Close</string>
+    <string name="search_hint">Search files</string>
+    <string name="selected_count">%1$d selected</string>
+    <string name="btn_copy">Copy</string>
+    <string name="btn_move">Move</string>
+    <string name="btn_rename">Rename</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_apk_tools">APK tools</string>
+    <string name="btn_new_folder">New folder</string>
+    <string name="btn_sort">Sort</string>
+    <string name="btn_paste">Paste (%1$d)</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_create">Create</string>
+    <string name="btn_continue">Continue</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_size">Size</string>
+    <string name="sort_date">Date</string>
+    <string name="empty_folder">Empty folder</string>
+    <string name="error_open_folder">This folder cannot be opened. Make sure access permission has been granted.</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_new_folder">Create new folder</string>
+    <string name="label_folder_name">Folder name</string>
+    <string name="dialog_rename">Rename</string>
+    <string name="label_new_name">New name</string>
+    <string name="confirm_delete_title">Delete item?</string>
+    <string name="confirm_delete_body">Delete %1$d selected item(s)? This action cannot be undone.</string>
+    <string name="confirm_paste_title">Paste here?</string>
+    <string name="confirm_paste_body">Paste %1$d item(s) into this folder?</string>
+    <string name="confirm_rename_title">Rename?</string>
+    <string name="confirm_rename_body">Rename this file?</string>
+    <string name="confirm_new_title">Create folder?</string>
+    <string name="confirm_new_body">Create a new folder in this location?</string>
+    <string name="confirm_generic_title">Continue?</string>
+    <string name="warn_system">This is a system folder. Changing or deleting the wrong files here can stop the phone from starting.</string>
+    <string name="warn_understand">I understand the risk</string>
+
+    <!-- Short messages -->
+    <string name="msg_deleted">%1$d item(s) deleted.</string>
+    <string name="msg_failed">Failed. Try again.</string>
+    <string name="msg_paste_result">%1$d of %2$d item(s) succeeded.</string>
+    <string name="msg_renamed">Renamed successfully.</string>
+    <string name="msg_folder_created">Folder created.</string>
+    <string name="msg_invalid_name">Invalid name.</string>
+    <string name="msg_name_exists">That name is already used.</string>
+    <string name="msg_root_denied">Root access is not available. Make sure the phone is rooted and superuser permission is granted.</string>
+    <string name="msg_root_on">Root mode is on.</string>
+    <string name="msg_root_off">Root mode is off.</string>
+    <string name="msg_clip_ready">Open the destination folder, then tap Paste.</string>
+    <string name="msg_cannot_open">This file cannot be opened.</string>
+
+    <!-- APK tools -->
+    <string name="apk_intro">Unpack: the APK contents are extracted into a Filemate folder. Repack: the unpacked folder is packed back into a new APK. Sign: the APK gets a signature so it can be installed.</string>
+    <string name="apk_manifest_title">AndroidManifest contents (text)</string>
+    <string name="apk_manifest_empty">No data yet.</string>
+    <string name="apk_manifest_failed">The manifest contents cannot be read.</string>
+    <string name="apk_btn_unpack">Unpack</string>
+    <string name="apk_btn_repack">Repack</string>
+    <string name="apk_btn_sign">Sign</string>
+    <string name="msg_apk_unpacked">Unpacked successfully to: %1$s</string>
+    <string name="msg_apk_repacked">Repacked successfully: %1$s (not signed yet)</string>
+    <string name="msg_apk_signed">Signed successfully: %1$s</string>
+    <string name="msg_apk_failed">Failed to process the APK.</string>
+    <string name="msg_need_unpack">Unpack the APK first before repacking.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_lang_header">Language</string>
+    <string name="settings_lang_id">Bahasa Indonesia</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_other_header">Other</string>
+    <string name="settings_about">About Filemate</string>
+    <string name="about_title">About Filemate</string>
+    <string name="about_body">Version 1.0. A file manager with tools to unpack, sign, and repack APKs.</string>
+
+    <!-- Navigation drawer -->
+    <string name="drawer_storage">Internal storage</string>
+    <string name="drawer_download">Download</string>
+    <string name="drawer_documents">Documents</string>
+    <string name="drawer_dcim">DCIM</string>
+    <string name="drawer_root">Root access</string>
+    <string name="drawer_root_desc">View system folders. Requires a rooted phone.</string>
+    <string name="drawer_settings">Settings</string>
+</resources>
