@@ -60,35 +60,34 @@ private class OpenChoice(
     val mode: OpenMode,
     val label: Int,
     val icon: ImageVector,
-    val tint: Color,
 )
 
-// Urutan dan warna mengikuti dialog "Buka dengan" di NP Manager
+// Urutan mengikuti dialog "Buka dengan" di NP Manager. Ikon satu warna, sesuai tema hitam putih.
 private val CHOICES = listOf(
-    OpenChoice(OpenMode.TEXT, R.string.open_text, Icons.Filled.Description, Color(0xFF3F51B5)),
-    OpenChoice(OpenMode.ARCHIVE, R.string.open_archive, Icons.Filled.Archive, Color(0xFFD32F2F)),
-    OpenChoice(OpenMode.IMAGE, R.string.open_image, Icons.Filled.Image, Color(0xFF2EAD6B)),
-    OpenChoice(OpenMode.HEX, R.string.open_hex, Icons.Filled.DataObject, Color(0xFF546E7A)),
-    OpenChoice(OpenMode.MUSIC, R.string.open_music, Icons.Filled.MusicNote, Color(0xFF7E57C2)),
-    OpenChoice(OpenMode.XML, R.string.open_xml, Icons.Filled.Code, Color(0xFF3F6FD8)),
-    OpenChoice(OpenMode.DEX, R.string.open_dex, Icons.Filled.Widgets, Color(0xFF2E8B8B)),
-    OpenChoice(OpenMode.ARSC, R.string.open_arsc, Icons.Filled.GridOn, Color(0xFFE8A33A)),
-    OpenChoice(OpenMode.APK_INFO, R.string.open_apk_info, Icons.Filled.Android, Color(0xFF3DDC84)),
-    OpenChoice(OpenMode.APKS, R.string.open_apks, Icons.Filled.Adb, Color(0xFFC0392B)),
-    OpenChoice(OpenMode.SCRIPT, R.string.open_script, Icons.Filled.Terminal, Color(0xFF111111)),
-    OpenChoice(OpenMode.FONT, R.string.open_font, Icons.Filled.TextFields, Color(0xFF3F6FD8)),
-    OpenChoice(OpenMode.SIGNATURE, R.string.open_signature, Icons.Filled.VpnKey, Color(0xFF7CB342)),
-    OpenChoice(OpenMode.SVG, R.string.open_svg, Icons.Filled.Photo, Color(0xFF2EAD6B)),
-    OpenChoice(OpenMode.JAR, R.string.open_jar, Icons.Filled.Coffee, Color(0xFFC0392B)),
-    OpenChoice(OpenMode.PDF, R.string.open_pdf, Icons.Filled.PictureAsPdf, Color(0xFFE53935)),
-    OpenChoice(OpenMode.CLASS, R.string.open_class, Icons.Filled.Article, Color(0xFF7E57C2)),
-    OpenChoice(OpenMode.MARKDOWN, R.string.open_markdown, Icons.Filled.Tag, Color(0xFF455A64)),
-    OpenChoice(OpenMode.DATABASE, R.string.open_database, Icons.Filled.Storage, Color(0xFF9E9E9E)),
-    OpenChoice(OpenMode.NINE_PATCH, R.string.open_nine_patch, Icons.Filled.Photo, Color(0xFF26A69A)),
+    OpenChoice(OpenMode.TEXT, R.string.open_text, Icons.Filled.Description),
+    OpenChoice(OpenMode.ARCHIVE, R.string.open_archive, Icons.Filled.Archive),
+    OpenChoice(OpenMode.IMAGE, R.string.open_image, Icons.Filled.Image),
+    OpenChoice(OpenMode.HEX, R.string.open_hex, Icons.Filled.DataObject),
+    OpenChoice(OpenMode.MUSIC, R.string.open_music, Icons.Filled.MusicNote),
+    OpenChoice(OpenMode.XML, R.string.open_xml, Icons.Filled.Code),
+    OpenChoice(OpenMode.DEX, R.string.open_dex, Icons.Filled.Widgets),
+    OpenChoice(OpenMode.ARSC, R.string.open_arsc, Icons.Filled.GridOn),
+    OpenChoice(OpenMode.APK_INFO, R.string.open_apk_info, Icons.Filled.Android),
+    OpenChoice(OpenMode.APKS, R.string.open_apks, Icons.Filled.Adb),
+    OpenChoice(OpenMode.SCRIPT, R.string.open_script, Icons.Filled.Terminal),
+    OpenChoice(OpenMode.FONT, R.string.open_font, Icons.Filled.TextFields),
+    OpenChoice(OpenMode.SIGNATURE, R.string.open_signature, Icons.Filled.VpnKey),
+    OpenChoice(OpenMode.SVG, R.string.open_svg, Icons.Filled.Photo),
+    OpenChoice(OpenMode.JAR, R.string.open_jar, Icons.Filled.Coffee),
+    OpenChoice(OpenMode.PDF, R.string.open_pdf, Icons.Filled.PictureAsPdf),
+    OpenChoice(OpenMode.CLASS, R.string.open_class, Icons.Filled.Article),
+    OpenChoice(OpenMode.MARKDOWN, R.string.open_markdown, Icons.Filled.Tag),
+    OpenChoice(OpenMode.DATABASE, R.string.open_database, Icons.Filled.Storage),
+    OpenChoice(OpenMode.NINE_PATCH, R.string.open_nine_patch, Icons.Filled.Photo),
 )
 
 /**
- * Dialog "Buka dengan..." seperti NP Manager: kotak ikon berwarna tiga kolom.
+ * Dialog "Buka dengan..." seperti NP Manager: kotak ikon tiga kolom.
  * Tombol "Saran sistem" membuka pilihan aplikasi bawaan Android.
  */
 @Composable
@@ -125,7 +124,7 @@ fun OpenWithDialog(
                                     Icon(
                                         imageVector = choice.icon,
                                         contentDescription = null,
-                                        tint = choice.tint,
+                                        tint = MenuIcon,
                                         modifier = Modifier.size(38.dp),
                                     )
                                     Spacer(Modifier.height(6.dp))

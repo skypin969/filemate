@@ -11,9 +11,6 @@ object AppPrefs {
     /** Folder yang dibuka saat aplikasi mulai. Kosong berarti penyimpanan internal. */
     const val KEY_HOME = "home_path"
 
-    /** Minta akses root begitu aplikasi dibuka. */
-    const val KEY_ROOT_START = "root_at_start"
-
     /** Editor menyimpan berkas asli sebagai .bak sebelum menimpanya. */
     const val KEY_BACKUP = "editor_backup"
 

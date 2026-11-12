@@ -7,30 +7,37 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 
-// Warna mengikuti NP Manager (diambil dari tangkapan layar)
-val NpBlue = Color(0xFF409EFF)        // bilah atas, ikon folder
-val NpBlueDark = Color(0xFF2B69AA)    // garis penanda panel aktif
-val Accent = Color(0xFF3076BF)        // tombol teks, judul bagian, sakelar
+// Tema hitam putih: satu tampilan tetap (bukan mode gelap/terang). Bilah atas hitam, latar putih.
+// Satu-satunya warna lain adalah merah untuk tindakan hapus, supaya tidak tertukar.
+val Primary = Color(0xFF111111)       // bilah atas, layar pembuka
+val PrimaryDark = Color(0xFF111111)   // garis penanda panel aktif
+val Accent = Color(0xFF111111)        // tombol teks, judul bagian, sakelar
+val FolderColor = Color(0xFF2F2F2F)   // ikon folder
 val SoftGray = Color(0xFFF5F5F5)      // latar kotak lembut
-val SelectTint = Color(0xFFDCEBFF)    // baris yang dipilih
-val IconBox = Color(0xFFE8F3FF)       // kotak di belakang ikon menu samping
+val SelectTint = Color(0xFFE2E2E2)    // baris yang dipilih
+val IconBox = Color(0xFFEDEDED)       // kotak di belakang ikon menu samping
 val PageGray = Color(0xFFFAFAFA)      // latar halaman pengaturan
 val Ink = Color(0xFF111111)           // teks utama
 val Muted = Color(0xFF646464)         // teks kecil, ikon bilah bawah
 val Disabled = Color(0xFFC8C8C8)      // ikon yang tidak aktif
 val LineColor = Color(0xFFE3E3E3)     // garis pemisah
 val Danger = Color(0xFFC62828)        // hapus
-val FileTint = Color(0xFF546E7A)      // ikon berkas biasa
+val FileTint = Color(0xFF757575)      // ikon berkas biasa
 val MenuIcon = Color(0xFF424242)      // ikon di menu
 
-val HeaderBrush: Brush = SolidColor(NpBlue)
+val HeaderBrush: Brush = SolidColor(Primary)
 
 private val LightColors = lightColorScheme(
     primary = Accent,
     onPrimary = Color.White,
     primaryContainer = SelectTint,
     onPrimaryContainer = Ink,
-    secondary = NpBlue,
+    secondary = Primary,
+    secondaryContainer = SelectTint,
+    onSecondaryContainer = Ink,
+    surfaceVariant = SoftGray,
+    onSurfaceVariant = Muted,
+    outline = Muted,
     background = Color.White,
     onBackground = Ink,
     surface = Color.White,

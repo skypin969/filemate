@@ -114,7 +114,7 @@ fun TrashScreen(onBack: () -> Unit) {
                     Icon(
                         imageVector = if (entry.stored.isDirectory) Icons.Filled.Folder else Icons.Filled.InsertDriveFile,
                         contentDescription = null,
-                        tint = if (entry.stored.isDirectory) NpBlue else FileTint,
+                        tint = if (entry.stored.isDirectory) FolderColor else FileTint,
                         modifier = Modifier.size(30.dp),
                     )
                     Spacer(Modifier.width(8.dp))

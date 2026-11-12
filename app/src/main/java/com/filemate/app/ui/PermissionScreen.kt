@@ -64,7 +64,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             // Biru hanya di belakang bilah status, supaya ikon putihnya tetap terlihat
-            .background(NpBlue)
+            .background(Primary)
             .statusBarsPadding()
             .background(Color.White)
             .navigationBarsPadding()
@@ -80,7 +80,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Folder,
                 contentDescription = null,
-                tint = NpBlue,
+                tint = Primary,
                 modifier = Modifier.size(36.dp),
             )
         }

@@ -157,7 +157,6 @@
     <string name="drawer_bookmarks">Bookmark</string>
     <string name="drawer_bookmarks_empty">Belum ada bookmark. Tekan lama sebuah folder, lalu pilih Tambah bookmark.</string>
     <string name="cd_remove_bookmark">Hapus bookmark</string>
-    <string name="drawer_root">Akses root</string>
     <string name="drawer_settings">Pengaturan</string>
     <!-- Tampilan gaya NP Manager -->
     <string name="top_info">folder: %1$d berkas: %2$d penyimpanan: %3$s/%4$s %5$s</string>
@@ -250,8 +249,6 @@
     <string name="apps_extracted">APK disimpan di: %1$s</string>
     <string name="apps_extract_failed">Gagal mengambil APK.</string>
     <string name="settings_start_header">Memulai</string>
-    <string name="settings_root_title">Minta akses root</string>
-    <string name="settings_root_desc">Minta akses root saat aplikasi dibuka. Perubahan berlaku setelah aplikasi dibuka ulang.</string>
     <string name="settings_home_title">Atur jalur awal</string>
     <string name="settings_home_reset">Ketuk untuk kembali ke penyimpanan internal.</string>
     <string name="settings_display_header">Pengaturan tampilan</string>
@@ -270,4 +267,5 @@
     <string name="trash_empty">Recycle Bin kosong.</string>
     <string name="trash_restore">Pulihkan</string>
     <string name="trash_delete_forever">Hapus permanen</string>
+    <string name="btn_dual">Dua panel</string>
 </resources>

@@ -5,6 +5,7 @@ import android.os.StatFs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +71,6 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SendToMobile
 import androidx.compose.material.icons.filled.Settings
@@ -79,6 +79,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,8 +98,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -231,7 +230,6 @@ fun MainScreen(
         drawerState = drawerState,
         drawerContent = {
             DrawerSheet(
-                rootMode = state.rootMode,
                 bookmarks = state.bookmarks,
                 onGoto = { path ->
                     scope.launch { drawerState.close() }
@@ -241,7 +239,6 @@ fun MainScreen(
                     scope.launch { drawerState.close() }
                     vm.openRootDir()
                 },
-                onRootChange = { vm.setRootMode(it) },
                 onRemoveBookmark = { vm.removeBookmark(it) },
                 onSettings = {
                     scope.launch { drawerState.close() }
@@ -271,6 +268,8 @@ fun MainScreen(
                 TopBar(
                     path = active.path,
                     info = topInfo,
+                    dual = state.dual,
+                    onToggleDual = { vm.setDual(!state.dual) },
                     showHidden = state.showHidden,
                     onMenu = { scope.launch { drawerState.open() } },
                     onSearch = { vm.toggleSearch(true) },
@@ -288,19 +287,22 @@ fun MainScreen(
                 )
 
                 // Garis tipis di bawah bilah atas: bagian yang gelap menandai panel yang sedang aktif
-                Row(modifier = Modifier.fillMaxWidth().height(2.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .background(if (state.active == 0) NpBlueDark else LineColor),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .background(if (state.active == 1) NpBlueDark else LineColor),
-                    )
+                // Hanya tampil saat dua panel aktif
+                if (state.dual) {
+                    Row(modifier = Modifier.fillMaxWidth().height(3.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxSize()
+                                .background(if (state.active == 0) Muted else Color.White),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxSize()
+                                .background(if (state.active == 1) Muted else Color.White),
+                        )
+                    }
                 }
 
                 if (state.searchOpen) {
@@ -384,9 +386,29 @@ fun MainScreen(
             item = item,
             // Panel kiri menyalin ke kanan, panel kanan menyalin ke kiri
             towardRight = index == 0,
+            dual = state.dual,
             onDismiss = { menuTarget = null },
-            onCopyOther = { closeMenu { vm.transferToOtherPanel(index, listOf(item.path), move = false) } },
-            onMoveOther = { closeMenu { vm.transferToOtherPanel(index, listOf(item.path), move = true) } },
+            // Dua panel: langsung ke panel sebelah. Satu panel: disimpan dulu, lalu ditempel di folder tujuan.
+            onCopyOther = {
+                closeMenu {
+                    if (state.dual) {
+                        vm.transferToOtherPanel(index, listOf(item.path), move = false)
+                    } else {
+                        vm.setActive(index)
+                        vm.setClipPaths(listOf(item.path), move = false)
+                    }
+                }
+            },
+            onMoveOther = {
+                closeMenu {
+                    if (state.dual) {
+                        vm.transferToOtherPanel(index, listOf(item.path), move = true)
+                    } else {
+                        vm.setActive(index)
+                        vm.setClipPaths(listOf(item.path), move = true)
+                    }
+                }
+            },
             onRename = {
                 closeMenu {
                     vm.setActive(index)
@@ -510,7 +532,7 @@ fun MainScreen(
                 action = action,
                 system = dialog.system,
                 single = single,
-                trashAvailable = !state.rootMode && deletePaths.isNotEmpty() && deletePaths.all { Trash.supports(it) },
+                trashAvailable = deletePaths.isNotEmpty() && deletePaths.all { Trash.supports(it) },
                 onConfirm = { vm.confirmAction(it) },
                 onDismiss = { vm.dismissDialog() },
             )
@@ -551,6 +573,8 @@ fun MainScreen(
 private fun TopBar(
     path: String,
     info: String,
+    dual: Boolean,
+    onToggleDual: () -> Unit,
     showHidden: Boolean,
     onMenu: () -> Unit,
     onSearch: () -> Unit,
@@ -603,6 +627,25 @@ private fun TopBar(
                 lineHeight = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        // Tombol kecil dua panel: putih penuh saat dua panel aktif, bergaris saat satu panel
+        Box(
+            modifier = Modifier
+                .padding(end = 2.dp)
+                .size(30.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(if (dual) Color.White else Color.Transparent)
+                .border(1.dp, Color.White, RoundedCornerShape(7.dp))
+                .clickable(onClick = onToggleDual),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ViewColumn,
+                contentDescription = stringResource(R.string.btn_dual),
+                tint = if (dual) Primary else Color.White,
+                modifier = Modifier.size(18.dp),
             )
         }
 
@@ -685,7 +728,7 @@ private fun OverflowItem(
             Icon(
                 imageVector = if (checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
                 contentDescription = null,
-                tint = if (checked) NpBlue else Muted,
+                tint = if (checked) Ink else Muted,
             )
         }
     }
@@ -809,7 +852,7 @@ private fun PasteBar(count: Int?, onPaste: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = NpBlue),
+        colors = ButtonDefaults.buttonColors(containerColor = Primary),
     ) {
         Text(stringResource(R.string.btn_paste, count), fontWeight = FontWeight.SemiBold)
     }
@@ -882,6 +925,7 @@ private class MenuEntry(
 private fun ItemMenu(
     item: FileItem,
     towardRight: Boolean,
+    dual: Boolean,
     onDismiss: () -> Unit,
     onCopyOther: () -> Unit,
     onMoveOther: () -> Unit,
@@ -904,8 +948,8 @@ private fun ItemMenu(
     val copyText = stringResource(R.string.btn_copy)
     val moveText = stringResource(R.string.btn_move)
     // Tanda panah menunjukkan arah panel tujuan
-    val copyLabel = if (towardRight) "$copyText ->" else "<- $copyText"
-    val moveLabel = if (towardRight) "$moveText ->" else "<- $moveText"
+    val copyLabel = if (!dual) copyText else if (towardRight) "$copyText ->" else "<- $copyText"
+    val moveLabel = if (!dual) moveText else if (towardRight) "$moveText ->" else "<- $moveText"
 
     val entries = listOfNotNull(
         MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
@@ -1121,11 +1165,9 @@ private class DrawerTool(val label: Int, val icon: ImageVector, val action: (() 
  */
 @Composable
 private fun DrawerSheet(
-    rootMode: Boolean,
     bookmarks: List<String>,
     onGoto: (String) -> Unit,
     onRootDir: () -> Unit,
-    onRootChange: (Boolean) -> Unit,
     onRemoveBookmark: (String) -> Unit,
     onSettings: () -> Unit,
     onApps: () -> Unit,
@@ -1203,7 +1245,7 @@ private fun DrawerSheet(
         ) {
             DrawerSection(stringResource(R.string.drawer_section_local), localOpen) { localOpen = !localOpen }
             if (localOpen) {
-                // Direktori root meminta akses root dulu jika belum aktif
+                // Akses root aktif otomatis. Jika belum, mengetuk Direktori root mencobanya lagi.
                 StorageRow(
                     title = stringResource(R.string.drawer_root_dir),
                     icon = Icons.Filled.PhoneAndroid,
@@ -1216,27 +1258,6 @@ private fun DrawerSheet(
                     path = FileRepository.STORAGE_ROOT,
                     onClick = { onGoto(FileRepository.STORAGE_ROOT) },
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onRootChange(!rootMode) }
-                        .padding(start = 16.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    DrawerIcon(Icons.Filled.Security)
-                    Spacer(Modifier.width(14.dp))
-                    Text(
-                        text = stringResource(R.string.drawer_root),
-                        color = Ink,
-                        fontSize = 15.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = rootMode,
-                        onCheckedChange = onRootChange,
-                        colors = SwitchDefaults.colors(checkedTrackColor = Accent),
-                    )
-                }
             }
 
             DrawerSection(stringResource(R.string.drawer_bookmarks), bookmarkOpen) { bookmarkOpen = !bookmarkOpen }

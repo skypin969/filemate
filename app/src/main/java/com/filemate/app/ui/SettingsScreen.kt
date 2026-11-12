@@ -53,7 +53,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { AppPrefs.of(context) }
     val isEnglish = AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("en")
-    var rootAtStart by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_ROOT_START, false)) }
     var backup by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_BACKUP, false)) }
     var home by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()) }
     var showAbout by remember { mutableStateOf(false) }
@@ -92,15 +91,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .navigationBarsPadding(),
         ) {
             SectionTitle(stringResource(R.string.settings_start_header))
-            SettingRow(
-                title = stringResource(R.string.settings_root_title),
-                subtitle = stringResource(R.string.settings_root_desc),
-                checked = rootAtStart,
-                onClick = {
-                    rootAtStart = !rootAtStart
-                    prefs.edit().putBoolean(AppPrefs.KEY_ROOT_START, rootAtStart).apply()
-                },
-            )
             SettingRow(
                 title = stringResource(R.string.settings_home_title),
                 subtitle = if (home.isEmpty()) {

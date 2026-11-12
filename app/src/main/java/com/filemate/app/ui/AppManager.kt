@@ -258,7 +258,7 @@ fun AppManagerScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(6.dp))
 
         if (apps == null) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NpBlue)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Primary)
         }
 
         LazyColumn(
@@ -372,7 +372,7 @@ private fun AppCard(app: AppRow, onOpen: () -> Unit, onExtract: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.Android,
                 contentDescription = null,
-                tint = Color(0xFF3DDC84),
+                tint = MenuIcon,
                 modifier = Modifier.size(46.dp),
             )
         }

@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,7 +71,7 @@ fun FilePanel(
             .clickable(onClick = onActivate),
     ) {
         if (panel.loading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NpBlue)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Primary)
         }
 
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -129,7 +130,7 @@ private fun ParentRow(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Filled.Folder,
             contentDescription = null,
-            tint = NpBlue,
+            tint = FolderColor,
             modifier = Modifier.size(30.dp),
         )
         Spacer(Modifier.width(8.dp))
@@ -176,7 +177,8 @@ private fun FileRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.name,
-                color = if (recent) RecentGreen else Ink,
+                color = Ink,
+                fontWeight = if (recent) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 15.sp,
                 lineHeight = 18.sp,
                 maxLines = 3,
@@ -204,24 +206,24 @@ private fun FileIcon(item: FileItem) {
         item.isDir -> Icon(
             imageVector = Icons.Filled.Folder,
             contentDescription = null,
-            tint = NpBlue,
+            tint = FolderColor,
             modifier = Modifier.size(30.dp),
         )
 
         item.isApk -> ApkIcon(item.path)
 
-        // Berkas teks: ikon papan catatan biru. Arsip: ikon merah. Seperti NP Manager.
+        // Berkas teks dan arsip punya bentuk ikon sendiri, warnanya tetap abu-abu gelap (tema hitam putih)
         item.extension in TEXT_EXT -> Icon(
             imageVector = Icons.Filled.Assignment,
             contentDescription = null,
-            tint = Color(0xFF3F51B5),
+            tint = MenuIcon,
             modifier = Modifier.size(30.dp),
         )
 
         item.extension in ARCHIVE_EXT -> Icon(
             imageVector = Icons.Filled.Archive,
             contentDescription = null,
-            tint = Color(0xFFC62828),
+            tint = MenuIcon,
             modifier = Modifier.size(30.dp),
         )
 
@@ -234,7 +236,7 @@ private fun FileIcon(item: FileItem) {
     }
 }
 
-/** Akhiran berkas yang dianggap teks: dibuka langsung di editor teks dan diberi ikon biru. */
+/** Akhiran berkas yang dianggap teks: dibuka langsung di editor teks dan diberi ikon papan catatan. */
 val TEXT_EXT = setOf(
     "TXT", "MD", "XML", "JSON", "HTML", "HTM", "CSS", "JS", "SH", "PROP", "CONF", "CFG", "INI", "LOG", "RC",
     "JAVA", "KT", "KTS", "SMALI", "YML", "YAML", "CSV", "SVG", "PY", "C", "H", "CPP", "GRADLE", "PROPERTIES", "BAT",
@@ -242,8 +244,7 @@ val TEXT_EXT = setOf(
 
 private val ARCHIVE_EXT = setOf("ZIP", "RAR", "7Z", "TAR", "GZ", "TGZ", "XZ", "BZ2", "JAR", "APKS", "XAPK")
 
-/** Berkas yang baru dibuat atau diubah (30 menit terakhir) namanya berwarna hijau, seperti NP Manager. */
-private val RecentGreen = Color(0xFF2E9E4F)
+/** Berkas yang baru dibuat atau diubah (30 menit terakhir) namanya dicetak tebal. */
 private const val RECENT_MILLIS = 30L * 60 * 1000
 
 // Ikon APK yang sudah pernah dimuat, supaya tidak dimuat ulang setiap daftar digulir
@@ -269,7 +270,7 @@ private fun ApkIcon(path: String) {
         Icon(
             imageVector = Icons.Filled.Android,
             contentDescription = null,
-            tint = Color(0xFF3DDC84),
+            tint = MenuIcon,
             modifier = Modifier.size(30.dp),
         )
     }

@@ -41,7 +41,7 @@ fun SplashScreen(onFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NpBlue),
+            .background(Primary),
     ) {
         Column(
             modifier = Modifier

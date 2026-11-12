@@ -135,8 +135,9 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         reloadAll()
-        // Pengaturan "Minta akses root saat memulai"
-        if (prefs.getBoolean(AppPrefs.KEY_ROOT_START, false)) setRootMode(true, quiet = true)
+        // Akses root dicoba otomatis setiap aplikasi dibuka. Jika izin sudah diberikan di aplikasi
+        // pengelola root (Magisk, KernelSU), mode root langsung aktif tanpa tombol.
+        setRootMode(true, quiet = true)
     }
 
     /** Folder awal: folder beranda pilihan user jika masih bisa dibuka, kalau tidak penyimpanan internal. */
@@ -195,7 +196,9 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         updatePanel(index) { it.copy(loading = true, error = false) }
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                if (root) FileRepository.listRoot(path) else FileRepository.listLocal(path)
+                // Penyimpanan internal dibaca langsung karena lebih cepat. Root hanya dipakai untuk folder lain.
+                val inStorage = path.startsWith("/storage/emulated")
+                if (root && !inStorage) FileRepository.listRoot(path) else FileRepository.listLocal(path)
             }
             val sort = _state.value.sort
             updatePanel(index) { panel ->
@@ -555,7 +558,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         return when (action) {
             is FileAction.Delete -> {
                 // Recycle Bin hanya untuk berkas di penyimpanan internal. Selain itu dihapus selamanya.
-                val useTrash = action.toTrash && !root && action.paths.all { Trash.supports(it) }
+                val useTrash = action.toTrash && action.paths.all { Trash.supports(it) }
                 val ok = if (useTrash) {
                     action.paths.map { Trash.move(it) }.all { it }
                 } else {
