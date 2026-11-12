@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -112,6 +113,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(
     onOpenSettings: () -> Unit,
+    onOpenEditor: (EditorTarget) -> Unit,
     vm: FileManagerViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -128,6 +130,11 @@ fun MainScreen(
             drawerState.isOpen -> scope.launch { drawerState.close() }
             !vm.goBack() -> (context as? Activity)?.finish()
         }
+    }
+
+    // Saat kembali dari editor atau pengaturan, isi panel dimuat ulang (ukuran dan tanggal berkas bisa berubah)
+    LaunchedEffect(Unit) {
+        vm.reloadAll()
     }
 
     LaunchedEffect(state.message) {
@@ -313,6 +320,8 @@ fun MainScreen(
             },
             onCompress = { closeMenu { vm.setActive(index); vm.compressPath(item.path) } },
             onExtract = { closeMenu { vm.setActive(index); vm.extractZip(item.path) } },
+            onEditText = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode)) } },
+            onEditHex = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode)) } },
             onAttributes = { closeMenu { vm.showDialog(AppDialog.Attributes(item)) } },
             onShare = { closeMenu { shareFile(context, item) } },
             onOpenWith = { closeMenu { openWith(context, item) } },
@@ -731,6 +740,8 @@ private fun ItemSheet(
     onDelete: () -> Unit,
     onCompress: () -> Unit,
     onExtract: () -> Unit,
+    onEditText: () -> Unit,
+    onEditHex: () -> Unit,
     onAttributes: () -> Unit,
     onShare: () -> Unit,
     onOpenWith: () -> Unit,
@@ -763,6 +774,10 @@ private fun ItemSheet(
             SheetAction(stringResource(R.string.menu_compress), Icons.Filled.Archive, onCompress)
             if (isZip) {
                 SheetAction(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, onExtract)
+            }
+            if (!item.isDir) {
+                SheetAction(stringResource(R.string.menu_edit_text), Icons.Filled.Description, onEditText)
+                SheetAction(stringResource(R.string.menu_edit_hex), Icons.Filled.Code, onEditHex)
             }
             SheetAction(stringResource(R.string.menu_attributes), Icons.Filled.Info, onAttributes)
             if (item.isDir) {

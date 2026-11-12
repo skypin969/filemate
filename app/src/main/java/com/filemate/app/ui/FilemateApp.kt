@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
@@ -15,6 +16,14 @@ enum class Screen { SPLASH, PERMISSION, MAIN, SETTINGS }
 @Composable
 fun FilemateApp() {
     var screen by rememberSaveable { mutableStateOf(Screen.SPLASH) }
+    // Editor teks atau hex tampil menutupi layar utama. Tidak ikut tersimpan jika aplikasi ditutup paksa.
+    var editor by remember { mutableStateOf<EditorTarget?>(null) }
+
+    val open = editor
+    if (open != null) {
+        EditorScreen(target = open, onBack = { editor = null })
+        return
+    }
 
     when (screen) {
         Screen.SPLASH -> SplashScreen(
@@ -29,6 +38,7 @@ fun FilemateApp() {
 
         Screen.MAIN -> MainScreen(
             onOpenSettings = { screen = Screen.SETTINGS },
+            onOpenEditor = { editor = it },
         )
 
         Screen.SETTINGS -> {

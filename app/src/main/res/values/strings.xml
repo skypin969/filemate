@@ -121,6 +121,28 @@
     <string name="attr_type_file">Berkas</string>
     <string name="attr_size">Ukuran</string>
     <string name="attr_modified">Terakhir diubah</string>
+    <string name="menu_edit_text">Edit teks</string>
+    <string name="menu_edit_hex">Edit hex</string>
+    <string name="btn_save">Simpan</string>
+    <string name="btn_discard">Buang</string>
+    <string name="cd_back">Kembali</string>
+    <string name="editor_loading">Memuat...</string>
+    <string name="editor_cannot_open">Berkas ini tidak bisa dibuka atau diubah. Untuk berkas sistem, aktifkan akses root.</string>
+    <string name="editor_too_big">Berkas terlalu besar untuk editor teks (maks 2 MB). Coba Edit hex.</string>
+    <string name="editor_binary">Berkas ini bukan teks (berkas biner atau bukan UTF-8). Pakai Edit hex.</string>
+    <string name="editor_saved">Tersimpan.</string>
+    <string name="editor_save_failed">Gagal menyimpan. Coba lagi.</string>
+    <string name="editor_discard_title">Buang perubahan?</string>
+    <string name="editor_discard_body">Perubahan yang belum disimpan akan hilang.</string>
+    <string name="editor_keep_editing">Lanjut edit</string>
+    <string name="editor_hex_edit_title">Ubah byte di offset %1$s</string>
+    <string name="editor_hex_hint">Contoh: 4F</string>
+    <string name="editor_hex_invalid">Isi 1 atau 2 digit hex (0-9, A-F).</string>
+    <string name="editor_apply">Terapkan</string>
+    <string name="editor_prev">Sebelumnya</string>
+    <string name="editor_next">Berikutnya</string>
+    <string name="editor_page_info">%1$s - %2$s dari %3$s byte</string>
+    <string name="editor_pending">%1$d byte belum disimpan</string>
 
     <!-- Alat APK -->
     <string name="apk_intro">Bongkar: isi APK dibuka ke folder Filemate. Rakit ulang: folder hasil bongkar dikemas lagi jadi APK baru. Tanda tangan: APK diberi tanda tangan supaya bisa dipasang.</string>

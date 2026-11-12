@@ -121,6 +121,28 @@
     <string name="attr_type_file">File</string>
     <string name="attr_size">Size</string>
     <string name="attr_modified">Last modified</string>
+    <string name="menu_edit_text">Edit text</string>
+    <string name="menu_edit_hex">Edit hex</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_discard">Discard</string>
+    <string name="cd_back">Back</string>
+    <string name="editor_loading">Loading...</string>
+    <string name="editor_cannot_open">This file cannot be opened or changed. For system files, turn on root access.</string>
+    <string name="editor_too_big">File is too big for the text editor (max 2 MB). Try Hex edit.</string>
+    <string name="editor_binary">This file is not text (binary file or not UTF-8). Use Hex edit.</string>
+    <string name="editor_saved">Saved.</string>
+    <string name="editor_save_failed">Save failed. Try again.</string>
+    <string name="editor_discard_title">Discard changes?</string>
+    <string name="editor_discard_body">Unsaved changes will be lost.</string>
+    <string name="editor_keep_editing">Keep editing</string>
+    <string name="editor_hex_edit_title">Change byte at offset %1$s</string>
+    <string name="editor_hex_hint">Example: 4F</string>
+    <string name="editor_hex_invalid">Enter 1 or 2 hex digits (0-9, A-F).</string>
+    <string name="editor_apply">Apply</string>
+    <string name="editor_prev">Previous</string>
+    <string name="editor_next">Next</string>
+    <string name="editor_page_info">%1$s - %2$s of %3$s bytes</string>
+    <string name="editor_pending">%1$d byte(s) not saved yet</string>
 
     <!-- APK tools -->
     <string name="apk_intro">Unpack: the APK contents are extracted into a Filemate folder. Repack: the unpacked folder is packed back into a new APK. Sign: the APK gets a signature so it can be installed.</string>
