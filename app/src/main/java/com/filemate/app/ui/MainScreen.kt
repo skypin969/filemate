@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
@@ -145,11 +147,6 @@ fun MainScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 TopBar(
-                    title = if (state.rootMode) {
-                        stringResource(R.string.title_root)
-                    } else {
-                        stringResource(R.string.title_storage)
-                    },
                     path = active.path,
                     dual = state.dual,
                     onMenu = { scope.launch { drawerState.open() } },
@@ -259,7 +256,6 @@ fun MainScreen(
 
 @Composable
 private fun TopBar(
-    title: String,
     path: String,
     dual: Boolean,
     onMenu: () -> Unit,
@@ -282,45 +278,37 @@ private fun TopBar(
             )
         }
 
-        Column(modifier = Modifier.weight(1f).padding(start = 2.dp)) {
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = path,
-                color = Color.White.copy(alpha = 0.85f),
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        // Lokasi folder yang sedang dibuka
+        Text(
+            text = path,
+            color = Color.White,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 2.dp),
+        )
 
-        // Tombol "Dua panel": putih saat aktif, transparan dengan garis saat tidak aktif
+        // Tombol "Dua panel" berupa ikon kecil: putih saat aktif, garis tipis saat tidak aktif
         Surface(
             onClick = onToggleDual,
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(8.dp),
             color = if (dual) Color.White else Color.Transparent,
             border = if (dual) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
             modifier = Modifier
                 .padding(end = 4.dp)
-                .height(36.dp),
+                .size(36.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = stringResource(R.string.btn_dual),
-                    color = if (dual) Blue700 else Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                Icon(
+                    imageVector = Icons.Filled.ViewColumn,
+                    contentDescription = stringResource(R.string.btn_dual),
+                    tint = if (dual) Blue700 else Color.White,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
