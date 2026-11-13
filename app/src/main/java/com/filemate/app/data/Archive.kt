@@ -23,6 +23,19 @@ object Archive {
         }
     }
 
+    /** Mengemas beberapa berkas atau folder sekaligus ke satu ZIP. */
+    fun zipAll(sources: List<File>, dest: File): Boolean {
+        return try {
+            ZipOutputStream(FileOutputStream(dest).buffered()).use { out ->
+                for (source in sources) addEntry(out, source, source.name)
+            }
+            true
+        } catch (e: Exception) {
+            dest.delete()
+            false
+        }
+    }
+
     private fun addEntry(out: ZipOutputStream, file: File, name: String) {
         if (file.isDirectory) {
             val children = file.listFiles().orEmpty()

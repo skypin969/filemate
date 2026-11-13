@@ -752,6 +752,28 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Kompres dan ekstrak ZIP ----------
 
     /** Mengompres berkas atau folder menjadi ZIP di folder yang sama. */
+    /** Mengompres beberapa berkas yang dipilih ke satu ZIP, diberi nama seperti folder tempatnya. */
+    fun compressPaths(paths: List<String>) {
+        if (paths.size == 1) {
+            compressPath(paths.first())
+            return
+        }
+        val sources = paths.map { File(it) }
+        val dir = sources.firstOrNull()?.parentFile ?: return
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                val dest = uniqueFile(dir, dir.name.ifEmpty { "Arsip" }, ".zip")
+                if (Archive.zipAll(sources, dest)) {
+                    text(R.string.msg_compressed, dest.name)
+                } else {
+                    text(R.string.msg_compress_failed)
+                }
+            }
+            _state.update { it.copy(message = message) }
+            reloadAll()
+        }
+    }
+
     fun compressPath(path: String) {
         val source = File(path)
         val dir = source.parentFile ?: return

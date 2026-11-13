@@ -474,8 +474,14 @@ fun MainScreen(
 
     // Menu kotak di tengah layar saat satu berkas ditekan lama
     menuTarget?.let { (index, item) ->
+        // Jika berkas yang ditekan termasuk yang sedang dipilih, Salin, Pindah, Hapus, dan Kompres
+        // berlaku untuk semua yang dipilih, bukan hanya berkas yang ditekan.
+        val panel = state.panels[index]
+        val picked = panel.items.filter { it.path in panel.selected }.map { it.path }
+        val targets = if (item.path in panel.selected && picked.size > 1) picked else listOf(item.path)
         ItemMenu(
             item = item,
+            multi = targets.size > 1,
             // Panel kiri menyalin ke kanan, panel kanan menyalin ke kiri
             towardRight = index == 0,
             dual = state.dual,
@@ -484,20 +490,20 @@ fun MainScreen(
             onCopyOther = {
                 closeMenu {
                     if (state.dual) {
-                        vm.transferToOtherPanel(index, listOf(item.path), move = false)
+                        vm.transferToOtherPanel(index, targets, move = false)
                     } else {
                         vm.setActive(index)
-                        vm.setClipPaths(listOf(item.path), move = false)
+                        vm.setClipPaths(targets, move = false)
                     }
                 }
             },
             onMoveOther = {
                 closeMenu {
                     if (state.dual) {
-                        vm.transferToOtherPanel(index, listOf(item.path), move = true)
+                        vm.transferToOtherPanel(index, targets, move = true)
                     } else {
                         vm.setActive(index)
-                        vm.setClipPaths(listOf(item.path), move = true)
+                        vm.setClipPaths(targets, move = true)
                     }
                 }
             },
@@ -510,10 +516,10 @@ fun MainScreen(
             onDelete = {
                 closeMenu {
                     vm.setActive(index)
-                    vm.deletePaths(listOf(item.path))
+                    vm.deletePaths(targets)
                 }
             },
-            onCompress = { closeMenu { vm.setActive(index); vm.compressPath(item.path) } },
+            onCompress = { closeMenu { vm.setActive(index); vm.compressPaths(targets) } },
             onAttributes = { closeMenu { vm.showDialog(AppDialog.Attributes(item)) } },
             onSend = { closeMenu { vm.notify(notReady) } },
             onShare = { closeMenu { shareFile(context, item) } },
@@ -1135,6 +1141,7 @@ private class MenuEntry(
 @Composable
 private fun ItemMenu(
     item: FileItem,
+    multi: Boolean,
     towardRight: Boolean,
     dual: Boolean,
     onDismiss: () -> Unit,
@@ -1162,7 +1169,13 @@ private fun ItemMenu(
     val copyLabel = if (!dual) copyText else if (towardRight) "$copyText ->" else "<- $copyText"
     val moveLabel = if (!dual) moveText else if (towardRight) "$moveText ->" else "<- $moveText"
 
-    val entries = listOfNotNull(
+    // Beberapa berkas dipilih: hanya pilihan yang bisa berlaku untuk semuanya sekaligus
+    val entries = if (multi) listOf(
+        MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
+        MenuEntry(moveLabel, Icons.Filled.ContentCut, Ink, onMoveOther),
+        MenuEntry(stringResource(R.string.btn_delete), Icons.Filled.Delete, Danger, onDelete),
+        MenuEntry(stringResource(R.string.menu_compress), Icons.Filled.Archive, Ink, onCompress),
+    ) else listOfNotNull(
         MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
         MenuEntry(moveLabel, Icons.Filled.ContentCut, Ink, onMoveOther),
         MenuEntry(stringResource(R.string.btn_rename), Icons.Filled.Edit, Ink, onRename),
