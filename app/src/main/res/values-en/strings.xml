@@ -361,4 +361,16 @@
     <string name="dex_no_file">First open a folder that contains an APK or DEX file.</string>
     <string name="new_text_hint">File name, for example notes.txt</string>
     <string name="mcp_group_dex">Dex</string>
+    <string name="dialog_jump">Jump</string>
+    <string name="dialog_jump_hint">Folder path</string>
+    <string name="msg_invalid_path">The path must start with a slash (/).</string>
+    <string name="settings_lang_auto">Detect automatically</string>
+    <string name="settings_list_size">File list size</string>
+    <string name="settings_size_small">Small</string>
+    <string name="settings_size_medium">Medium</string>
+    <string name="settings_size_large">Large</string>
+    <string name="settings_name_lines">Maximum file name lines</string>
+    <string name="settings_bottom_margin">Bottom toolbar bottom margin</string>
+    <string name="settings_thumbs_title">Load thumbnails</string>
+    <string name="settings_thumbs_desc">Show thumbnails for image files</string>
 </resources>

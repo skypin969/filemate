@@ -23,6 +23,18 @@ object AppPrefs {
     /** Layanan APK MCP boleh dihubungi dari perangkat lain di Wi-Fi yang sama. */
     const val KEY_MCP_LAN = "mcp_allow_lan"
 
+    /** Ukuran daftar berkas: 0 kecil, 1 sedang, 2 besar. */
+    const val KEY_LIST_SIZE = "list_size"
+
+    /** Jumlah baris paling banyak untuk nama berkas di daftar. */
+    const val KEY_NAME_LINES = "name_lines"
+
+    /** Jarak tambahan di bawah bilah tombol bawah, dalam dp. */
+    const val KEY_BOTTOM_MARGIN = "bottom_margin"
+
+    /** Menampilkan gambar mini untuk berkas gambar. */
+    const val KEY_THUMBS = "thumbnails"
+
     fun of(context: Context): SharedPreferences =
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 }

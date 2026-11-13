@@ -52,7 +52,20 @@ import com.filemate.app.R
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { AppPrefs.of(context) }
-    val isEnglish = AppCompatDelegate.getApplicationLocales().toLanguageTags().startsWith("en")
+    val languageTag = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+    val isEnglish = languageTag.startsWith("en")
+    val isAuto = languageTag.isEmpty()
+    var listSize by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_LIST_SIZE, 1)) }
+    var nameLines by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_NAME_LINES, 3)) }
+    var bottomMargin by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_BOTTOM_MARGIN, 0)) }
+    var thumbs by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_THUMBS, true)) }
+    // Dialog pilihan yang sedang terbuka: "size", "lines", atau "margin"
+    var choice by remember { mutableStateOf<String?>(null) }
+    val sizeLabels = listOf(
+        stringResource(R.string.settings_size_small),
+        stringResource(R.string.settings_size_medium),
+        stringResource(R.string.settings_size_large),
+    )
     var backup by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_BACKUP, false)) }
     var home by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()) }
     var showAbout by remember { mutableStateOf(false) }
@@ -107,8 +120,38 @@ fun SettingsScreen(onBack: () -> Unit) {
             SectionTitle(stringResource(R.string.settings_display_header))
             SettingRow(
                 title = stringResource(R.string.settings_lang_header),
-                subtitle = stringResource(if (isEnglish) R.string.settings_lang_en else R.string.settings_lang_id),
+                subtitle = stringResource(
+                    when {
+                        isAuto -> R.string.settings_lang_auto
+                        isEnglish -> R.string.settings_lang_en
+                        else -> R.string.settings_lang_id
+                    },
+                ),
                 onClick = { showLanguage = true },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_list_size),
+                subtitle = sizeLabels[listSize.coerceIn(0, 2)],
+                onClick = { choice = "size" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_name_lines),
+                subtitle = nameLines.toString(),
+                onClick = { choice = "lines" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_bottom_margin),
+                subtitle = "$bottomMargin dp",
+                onClick = { choice = "margin" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_thumbs_title),
+                subtitle = stringResource(R.string.settings_thumbs_desc),
+                checked = thumbs,
+                onClick = {
+                    thumbs = !thumbs
+                    prefs.edit().putBoolean(AppPrefs.KEY_THUMBS, thumbs).apply()
+                },
             )
 
             SectionTitle(stringResource(R.string.settings_general_header))
@@ -138,7 +181,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = { Text(stringResource(R.string.settings_lang_header), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
-                    LanguageRow(stringResource(R.string.settings_lang_id), !isEnglish) {
+                    LanguageRow(stringResource(R.string.settings_lang_auto), isAuto) {
+                        showLanguage = false
+                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+                    }
+                    LanguageRow(stringResource(R.string.settings_lang_id), !isEnglish && !isAuto) {
                         showLanguage = false
                         setLanguage("id")
                     }
@@ -156,6 +203,44 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
     }
 
+    when (choice) {
+        "size" -> ChoiceDialog(
+            title = stringResource(R.string.settings_list_size),
+            options = sizeLabels.mapIndexed { index, label -> label to index },
+            current = listSize,
+            onPick = {
+                listSize = it
+                prefs.edit().putInt(AppPrefs.KEY_LIST_SIZE, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "lines" -> ChoiceDialog(
+            title = stringResource(R.string.settings_name_lines),
+            options = (1..8).map { it.toString() to it },
+            current = nameLines,
+            onPick = {
+                nameLines = it
+                prefs.edit().putInt(AppPrefs.KEY_NAME_LINES, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "margin" -> ChoiceDialog(
+            title = stringResource(R.string.settings_bottom_margin),
+            options = listOf(0, 8, 16, 24, 32, 48).map { "$it dp" to it },
+            current = bottomMargin,
+            onPick = {
+                bottomMargin = it
+                prefs.edit().putInt(AppPrefs.KEY_BOTTOM_MARGIN, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+    }
+
     if (showAbout) {
         AlertDialog(
             onDismissRequest = { showAbout = false },
@@ -169,6 +254,34 @@ fun SettingsScreen(onBack: () -> Unit) {
             },
         )
     }
+}
+
+/** Dialog pilihan bulat (radio), dipakai untuk ukuran daftar, jumlah baris nama, dan margin bawah. */
+@Composable
+private fun ChoiceDialog(
+    title: String,
+    options: List<Pair<String, Int>>,
+    current: Int,
+    onPick: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                options.forEach { (label, value) ->
+                    LanguageRow(label, value == current) { onPick(value) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel), color = Accent)
+            }
+        },
+    )
 }
 
 @Composable

@@ -162,6 +162,22 @@ fun MainScreen(
     var openWithTarget by remember { mutableStateOf<FileItem?>(null) }
     val notReady = stringResource(R.string.msg_not_ready)
     var mcpOpen by remember { mutableStateOf(false) }
+    // Dialog "Lompat" yang muncul saat jalur di bilah atas diketuk
+    var jumpOpen by remember { mutableStateOf(false) }
+    // Pilihan tampilan dari halaman pengaturan. Dibaca ulang setiap kembali ke layar utama.
+    val listPrefs = remember { AppPrefs.of(context) }
+    val listStyle = remember {
+        ListStyle(
+            scale = when (listPrefs.getInt(AppPrefs.KEY_LIST_SIZE, 1)) {
+                0 -> 0.88f
+                2 -> 1.15f
+                else -> 1f
+            },
+            nameLines = listPrefs.getInt(AppPrefs.KEY_NAME_LINES, 3).coerceIn(1, 8),
+            thumbnails = listPrefs.getBoolean(AppPrefs.KEY_THUMBS, true),
+        )
+    }
+    val bottomMargin = remember { listPrefs.getInt(AppPrefs.KEY_BOTTOM_MARGIN, 0).coerceIn(0, 96) }
     // Dialog Layanan FTP, Layanan HTTP, atau Transfer LAN yang sedang terbuka
     var netDialog by remember { mutableStateOf<ToolKind?>(null) }
     // Dialog nama berkas baru untuk alat "Editor teks"
@@ -169,6 +185,7 @@ fun MainScreen(
     // Daftar APK/DEX di folder ini untuk dipilih alat "Analisis kelas"
     var classPickOpen by remember { mutableStateOf(false) }
     val noApkHere = stringResource(R.string.dex_no_file)
+    val invalidPath = stringResource(R.string.msg_invalid_path)
     val notReadyName = stringResource(R.string.msg_invalid_name)
 
     // Tombol kembali: tutup menu, lalu tutup pencarian/pilihan, lalu naik satu folder, lalu keluar
@@ -303,6 +320,7 @@ fun MainScreen(
                 TopBar(
                     path = active.path,
                     info = topInfo,
+                    onJump = { jumpOpen = true },
                     dual = state.dual,
                     onToggleDual = { vm.setDual(!state.dual) },
                     showHidden = state.showHidden,
@@ -384,6 +402,7 @@ fun MainScreen(
                             onTap = { item -> tapItem(index, item) },
                             onIconTap = { item -> vm.toggleSelect(index, item.path) },
                             onLongPress = { item -> menuTarget = index to item },
+                            style = listStyle,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -398,6 +417,7 @@ fun MainScreen(
                     canBack = active.back.isNotEmpty(),
                     canForward = active.forward.isNotEmpty(),
                     canSwap = state.dual,
+                    extraBottom = bottomMargin,
                     onBack = { vm.historyBack(state.active) },
                     onForward = { vm.historyForward(state.active) },
                     onAdd = { vm.showDialog(AppDialog.NewFolder(active.path)) },
@@ -528,6 +548,21 @@ fun MainScreen(
 
     if (mcpOpen) {
         McpDialog(onDismiss = { mcpOpen = false })
+    }
+
+    if (jumpOpen) {
+        InputDialog(
+            title = stringResource(R.string.dialog_jump),
+            label = stringResource(R.string.dialog_jump_hint),
+            initial = active.path,
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                jumpOpen = false
+                val target = typed.trim().let { if (it.length > 1) it.trimEnd('/') else it }
+                if (target.startsWith("/")) vm.openFolder(state.active, target) else vm.notify(invalidPath)
+            },
+            onDismiss = { jumpOpen = false },
+        )
     }
 
     netDialog?.let { kind ->
@@ -677,6 +712,7 @@ fun MainScreen(
 private fun TopBar(
     path: String,
     info: String,
+    onJump: () -> Unit,
     dual: Boolean,
     onToggleDual: () -> Unit,
     showHidden: Boolean,
@@ -711,9 +747,11 @@ private fun TopBar(
             )
         }
 
+        // Mengetuk jalur membuka dialog "Lompat" untuk mengetik alamat folder, seperti NP Manager
         Column(
             modifier = Modifier
                 .weight(1f)
+                .clickable(onClick = onJump)
                 .padding(start = 10.dp),
         ) {
             Text(
@@ -968,6 +1006,7 @@ private fun BottomBar(
     canBack: Boolean,
     canForward: Boolean,
     canSwap: Boolean,
+    extraBottom: Int,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onAdd: () -> Unit,
@@ -994,6 +1033,8 @@ private fun BottomBar(
             BarButton(Icons.Filled.SwapHoriz, stringResource(R.string.bar_swap), canSwap, onSwap)
             BarButton(Icons.Filled.Refresh, stringResource(R.string.bar_refresh), true, onRefresh)
         }
+        // Jarak tambahan dari pengaturan "Ukuran margin bawah bilah alat bawah"
+        if (extraBottom > 0) Spacer(Modifier.height(extraBottom.dp))
     }
 }
 

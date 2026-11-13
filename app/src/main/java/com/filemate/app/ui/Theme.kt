@@ -1,11 +1,16 @@
 package com.filemate.app.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.filemate.app.R
 
 // Tema hitam putih: satu tampilan tetap (bukan mode gelap/terang). Bilah atas hitam, latar putih.
 // Satu-satunya warna lain adalah merah untuk tindakan hapus, supaya tidak tertukar.
@@ -48,7 +53,35 @@ private val LightColors = lightColorScheme(
     error = Danger,
 )
 
+// Font aplikasi: Plus Jakarta Sans, dibawa di dalam aplikasi supaya tidak bergantung pada font sistem HP.
+val AppFont = FontFamily(
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_medium, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold),
+)
+
+// Semua gaya teks bawaan memakai font aplikasi. Teks berhuruf mesin tik (kode, terminal) tetap seperti semula.
+private val Base = Typography()
+private val AppTypography = Typography(
+    displayLarge = Base.displayLarge.copy(fontFamily = AppFont),
+    displayMedium = Base.displayMedium.copy(fontFamily = AppFont),
+    displaySmall = Base.displaySmall.copy(fontFamily = AppFont),
+    headlineLarge = Base.headlineLarge.copy(fontFamily = AppFont),
+    headlineMedium = Base.headlineMedium.copy(fontFamily = AppFont),
+    headlineSmall = Base.headlineSmall.copy(fontFamily = AppFont),
+    titleLarge = Base.titleLarge.copy(fontFamily = AppFont),
+    titleMedium = Base.titleMedium.copy(fontFamily = AppFont),
+    titleSmall = Base.titleSmall.copy(fontFamily = AppFont),
+    bodyLarge = Base.bodyLarge.copy(fontFamily = AppFont),
+    bodyMedium = Base.bodyMedium.copy(fontFamily = AppFont),
+    bodySmall = Base.bodySmall.copy(fontFamily = AppFont),
+    labelLarge = Base.labelLarge.copy(fontFamily = AppFont),
+    labelMedium = Base.labelMedium.copy(fontFamily = AppFont),
+    labelSmall = Base.labelSmall.copy(fontFamily = AppFont),
+)
+
 @Composable
 fun FilemateTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LightColors, content = content)
+    MaterialTheme(colorScheme = LightColors, typography = AppTypography, content = content)
 }

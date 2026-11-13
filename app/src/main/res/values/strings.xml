@@ -361,4 +361,16 @@
     <string name="dex_no_file">Buka dulu folder yang berisi berkas APK atau DEX.</string>
     <string name="new_text_hint">Nama berkas, misalnya catatan.txt</string>
     <string name="mcp_group_dex">Dex</string>
+    <string name="dialog_jump">Lompat</string>
+    <string name="dialog_jump_hint">Alamat folder</string>
+    <string name="msg_invalid_path">Alamat harus diawali garis miring (/).</string>
+    <string name="settings_lang_auto">Deteksi secara otomatis</string>
+    <string name="settings_list_size">Ukuran daftar file</string>
+    <string name="settings_size_small">Kecil</string>
+    <string name="settings_size_medium">Sedang</string>
+    <string name="settings_size_large">Besar</string>
+    <string name="settings_name_lines">Baris maksimum nama file</string>
+    <string name="settings_bottom_margin">Ukuran margin bawah bilah alat bawah</string>
+    <string name="settings_thumbs_title">Muat gambar mini</string>
+    <string name="settings_thumbs_desc">Tampilkan gambar mini berkas gambar</string>
 </resources>

@@ -205,9 +205,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         updatePanel(index) { it.copy(loading = true, error = false) }
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                // Penyimpanan internal dibaca langsung karena lebih cepat. Root hanya dipakai untuk folder lain.
+                // Penyimpanan internal dibaca langsung karena lebih cepat. Root dipakai untuk folder lain,
+                // dan untuk Android/data serta Android/obb yang disembunyikan Android dari aplikasi biasa.
                 val inStorage = path.startsWith("/storage/emulated")
-                if (root && !inStorage) FileRepository.listRoot(path) else FileRepository.listLocal(path)
+                when {
+                    root && FileRepository.isProtectedStorage(path) -> FileRepository.listProtected(path)
+                    root && !inStorage -> FileRepository.listRoot(path)
+                    else -> FileRepository.listLocal(path)
+                }
             }
             val sort = _state.value.sort
             updatePanel(index) { panel ->

@@ -48,15 +48,35 @@ object FileRepository {
         return Result.success(items)
     }
 
-    fun listRoot(dir: String): Result<List<FileItem>> {
+    /**
+     * Membaca isi folder lewat root. [shownDir] adalah alamat yang dipakai untuk hasilnya,
+     * jika berbeda dari alamat yang dibaca (lihat [listProtected]).
+     */
+    fun listRoot(dir: String, shownDir: String = dir): Result<List<FileItem>> {
         val result = RootShell.run("ls -la ${RootShell.quote(dir)}")
         if (result.exitCode != 0) {
             return Result.failure(IllegalStateException(result.output))
         }
         val items = result.output.lineSequence()
-            .mapNotNull { parseLsLine(it.trimEnd(), dir) }
+            .mapNotNull { parseLsLine(it.trimEnd(), shownDir) }
             .toList()
         return Result.success(items)
+    }
+
+    /** True untuk Android/data dan Android/obb, yang isinya disembunyikan Android dari aplikasi biasa. */
+    fun isProtectedStorage(path: String): Boolean =
+        path.startsWith("$STORAGE_ROOT/Android/data") || path.startsWith("$STORAGE_ROOT/Android/obb")
+
+    /**
+     * Membaca Android/data atau Android/obb lewat root. Jika alamat biasa tidak memberi hasil,
+     * dicoba lewat alamat asli penyimpanan (/data/media/0), dan hasilnya tetap ditampilkan dengan alamat biasa.
+     */
+    fun listProtected(dir: String): Result<List<FileItem>> {
+        val direct = listRoot(dir)
+        if (direct.isSuccess && direct.getOrDefault(emptyList()).isNotEmpty()) return direct
+        val real = "/data/media/0" + dir.removePrefix(STORAGE_ROOT)
+        val viaReal = listRoot(real, shownDir = dir)
+        return if (viaReal.isSuccess) viaReal else direct
     }
 
     private fun parseLsLine(line: String, dir: String): FileItem? {
