@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -279,6 +280,11 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
     val numbers = remember(lineCount) { (1..lineCount).joinToString("\n") }
     val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 18.sp, color = Ink)
     val ready = work != null && !loading
+    // Pewarnaan kode menurut jenis berkas. Dimatikan jika "Mode cairan" di pengaturan dinyalakan.
+    val coloring = remember(target.path) {
+        val fluid = AppPrefs.of(context).getBoolean(AppPrefs.KEY_FLUID, false)
+        if (fluid) VisualTransformation.None else SyntaxTransformation(target.path.substringAfterLast('.', ""))
+    }
 
     val err = error
     Column(modifier = Modifier.fillMaxSize().background(Color.White).imePadding()) {
@@ -317,6 +323,7 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
                             value = value,
                             onValueChange = { change(it) },
                             textStyle = style,
+                            visualTransformation = coloring,
                             cursorBrush = SolidColor(Accent),
                             modifier = Modifier
                                 .defaultMinSize(minWidth = 360.dp, minHeight = 300.dp)

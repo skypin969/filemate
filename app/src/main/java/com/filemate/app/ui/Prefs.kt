@@ -2,6 +2,8 @@ package com.filemate.app.ui
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.filemate.app.data.FileRepository
+import com.filemate.app.data.RootShell
 
 /** Nama dan kunci pengaturan yang disimpan di HP. Dipakai layar utama, pengaturan, dan editor. */
 object AppPrefs {
@@ -34,6 +36,55 @@ object AppPrefs {
 
     /** Menampilkan gambar mini untuk berkas gambar. */
     const val KEY_THUMBS = "thumbnails"
+
+    /** Warna tema yang dipilih di Pengaturan tema. */
+    const val KEY_THEME = "theme_color"
+
+    /** Perintah untuk mendapat akses root. Bawaannya "su". */
+    const val KEY_SU = "su_command"
+
+    /** Folder kerja Filemate (hasil bongkar APK, APK yang diambil, dan lainnya). */
+    const val KEY_WORK_DIR = "work_dir"
+
+    /** Gambar yang lebih besar dari ini (MB) tidak dibuatkan gambar mini. */
+    const val KEY_THUMB_MAX_MB = "thumb_max_mb"
+
+    /** Gambar mini yang belum selesai dimuat dalam waktu ini (detik) dibatalkan. */
+    const val KEY_THUMB_TIMEOUT = "thumb_timeout"
+
+    /** Berkas MD dan HTML dibuka sebagai pratinjau, bukan langsung di editor. */
+    const val KEY_MD_PREVIEW = "md_preview"
+    const val KEY_HTML_PREVIEW = "html_preview"
+
+    /** Mode cairan: pewarnaan kode di editor dimatikan supaya lebih ringan. */
+    const val KEY_FLUID = "editor_fluid"
+
+    /** Recycle Bin: fitur aktif, dicentang secara bawaan, dan peringatan merah saat hapus permanen. */
+    const val KEY_TRASH_ON = "trash_enabled"
+    const val KEY_TRASH_DEFAULT = "trash_default"
+    const val KEY_DELETE_WARNING = "delete_warning"
+
+    /** APK langsung ditandatangani setelah dirakit ulang. */
+    const val KEY_AUTO_SIGN = "apk_auto_sign"
+
+    /** APK dipasang lewat root (tanpa layar pemasang Android), dan nama paket yang dicatat sebagai sumbernya. */
+    const val KEY_ROOT_INSTALL = "apk_root_install"
+    const val KEY_INSTALLER = "apk_installer"
+
+    /** minSdkVersion yang dipakai saat mengubah JAR menjadi DEX. */
+    const val KEY_JAR_MIN_SDK = "jar_min_sdk"
+
+    /**
+     * Menerapkan pengaturan yang dipakai di banyak tempat: warna tema, perintah su, dan folder kerja.
+     * Dipanggil sekali saat aplikasi atau layanan latar belakang mulai.
+     */
+    fun applyStartup(context: Context) {
+        val prefs = of(context)
+        ThemeColors.primary = prefs.getInt(KEY_THEME, ThemeColors.DEFAULT)
+        RootShell.suCommand = prefs.getString(KEY_SU, "su").orEmpty().ifBlank { "su" }
+        FileRepository.FILEMATE_DIR =
+            prefs.getString(KEY_WORK_DIR, "").orEmpty().ifBlank { FileRepository.DEFAULT_FILEMATE_DIR }
+    }
 
     fun of(context: Context): SharedPreferences =
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE)

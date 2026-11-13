@@ -13,7 +13,11 @@ import java.util.Locale
 object FileRepository {
 
     const val STORAGE_ROOT = "/storage/emulated/0"
-    const val FILEMATE_DIR = "/storage/emulated/0/Filemate"
+    const val DEFAULT_FILEMATE_DIR = "/storage/emulated/0/Filemate"
+
+    /** Folder kerja Filemate. Bisa diganti di Pengaturan. */
+    @Volatile
+    var FILEMATE_DIR: String = DEFAULT_FILEMATE_DIR
 
     // Baris keluaran `ls -la`, contoh: -rw-rw---- 1 root sdcard_rw 1234 2026-11-12 10:00 nama.txt
     // Kolom: izin, jumlah link, pemilik, grup, ukuran, tanggal, nama

@@ -1,5 +1,9 @@
 package com.filemate.app.ui
 
+import android.widget.Toast
+import com.filemate.app.apk.Jar2Dex
+import com.filemate.app.data.FileRepository
+import com.filemate.app.data.RootShell
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,6 +73,31 @@ fun SettingsScreen(onBack: () -> Unit) {
     var backup by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_BACKUP, false)) }
     var home by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()) }
     var showAbout by remember { mutableStateOf(false) }
+    var theme by remember { mutableStateOf(ThemeColors.primary) }
+    var suCommand by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_SU, "su").orEmpty().ifBlank { "su" }) }
+    var workDir by remember { mutableStateOf(FileRepository.FILEMATE_DIR) }
+    var thumbMb by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_THUMB_MAX_MB, 10)) }
+    var thumbTime by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_THUMB_TIMEOUT, 10)) }
+    var installer by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_INSTALLER, "").orEmpty()) }
+    // Kolom isian yang sedang terbuka: "su", "dir", atau "installer"
+    var input by remember { mutableStateOf<String?>(null) }
+    val invalidDir = stringResource(R.string.settings_dir_invalid)
+    var jarMinSdk by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_JAR_MIN_SDK, Jar2Dex.DEFAULT_MIN_SDK)) }
+
+    /** Sakelar sederhana yang nilainya langsung disimpan. */
+    @Composable
+    fun Toggle(key: String, default: Boolean, title: Int, desc: Int?) {
+        var on by remember { mutableStateOf(prefs.getBoolean(key, default)) }
+        SettingRow(
+            title = stringResource(title),
+            subtitle = desc?.let { stringResource(it) },
+            checked = on,
+            onClick = {
+                on = !on
+                prefs.edit().putBoolean(key, on).apply()
+            },
+        )
+    }
     var showLanguage by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(PageGray)) {
@@ -105,6 +134,11 @@ fun SettingsScreen(onBack: () -> Unit) {
         ) {
             SectionTitle(stringResource(R.string.settings_start_header))
             SettingRow(
+                title = stringResource(R.string.settings_su_title),
+                subtitle = suCommand,
+                onClick = { input = "su" },
+            )
+            SettingRow(
                 title = stringResource(R.string.settings_home_title),
                 subtitle = if (home.isEmpty()) {
                     stringResource(R.string.title_storage)
@@ -118,6 +152,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
 
             SectionTitle(stringResource(R.string.settings_display_header))
+            SettingRow(
+                title = stringResource(R.string.settings_theme_title),
+                subtitle = stringResource(R.string.settings_theme_desc),
+                onClick = { choice = "theme" },
+            )
             SettingRow(
                 title = stringResource(R.string.settings_lang_header),
                 subtitle = stringResource(
@@ -153,6 +192,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                     prefs.edit().putBoolean(AppPrefs.KEY_THUMBS, thumbs).apply()
                 },
             )
+            SettingRow(
+                title = stringResource(R.string.settings_thumb_max_title),
+                subtitle = stringResource(R.string.settings_thumb_max_desc, thumbMb),
+                onClick = { choice = "thumbmb" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_thumb_time_title),
+                subtitle = stringResource(R.string.settings_thumb_time_desc, thumbTime),
+                onClick = { choice = "thumbtime" },
+            )
+
+            SectionTitle(stringResource(R.string.settings_editor_header))
+            Toggle(AppPrefs.KEY_MD_PREVIEW, true, R.string.settings_md_preview, null)
+            Toggle(AppPrefs.KEY_HTML_PREVIEW, true, R.string.settings_html_preview, null)
+            Toggle(AppPrefs.KEY_FLUID, false, R.string.settings_fluid_title, R.string.settings_fluid_desc)
 
             SectionTitle(stringResource(R.string.settings_general_header))
             SettingRow(
@@ -163,6 +217,30 @@ fun SettingsScreen(onBack: () -> Unit) {
                     backup = !backup
                     prefs.edit().putBoolean(AppPrefs.KEY_BACKUP, backup).apply()
                 },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_dir_title),
+                subtitle = workDir,
+                onClick = { input = "dir" },
+            )
+
+            SectionTitle(stringResource(R.string.tool_recycle))
+            Toggle(AppPrefs.KEY_TRASH_ON, true, R.string.settings_trash_on_title, R.string.settings_trash_on_desc)
+            Toggle(AppPrefs.KEY_TRASH_DEFAULT, true, R.string.settings_trash_default_title, R.string.settings_trash_default_desc)
+            Toggle(AppPrefs.KEY_DELETE_WARNING, true, R.string.settings_warning_title, R.string.settings_warning_desc)
+
+            SectionTitle(stringResource(R.string.settings_apk_header))
+            Toggle(AppPrefs.KEY_AUTO_SIGN, true, R.string.settings_auto_sign, null)
+            Toggle(AppPrefs.KEY_ROOT_INSTALL, true, R.string.settings_root_install_title, R.string.settings_root_install_desc)
+            SettingRow(
+                title = stringResource(R.string.settings_installer_title),
+                subtitle = installer.ifEmpty { stringResource(R.string.settings_default) },
+                onClick = { input = "installer" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_jar_title),
+                subtitle = stringResource(R.string.settings_jar_desc, jarMinSdk),
+                onClick = { input = "jar" },
             )
 
             SectionTitle(stringResource(R.string.settings_other_header))
@@ -228,6 +306,41 @@ fun SettingsScreen(onBack: () -> Unit) {
             onDismiss = { choice = null },
         )
 
+        "thumbmb" -> ChoiceDialog(
+            title = stringResource(R.string.settings_thumb_max_title),
+            options = listOf(1, 5, 10, 20, 50, 100).map { "$it MB" to it },
+            current = thumbMb,
+            onPick = {
+                thumbMb = it
+                prefs.edit().putInt(AppPrefs.KEY_THUMB_MAX_MB, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "thumbtime" -> ChoiceDialog(
+            title = stringResource(R.string.settings_thumb_time_title),
+            options = listOf(3, 5, 10, 20, 30, 60).map { it.toString() to it },
+            current = thumbTime,
+            onPick = {
+                thumbTime = it
+                prefs.edit().putInt(AppPrefs.KEY_THUMB_TIMEOUT, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "theme" -> ThemeDialog(
+            current = theme,
+            onPick = {
+                theme = it
+                ThemeColors.primary = it
+                prefs.edit().putInt(AppPrefs.KEY_THEME, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
         "margin" -> ChoiceDialog(
             title = stringResource(R.string.settings_bottom_margin),
             options = listOf(0, 8, 16, 24, 32, 48).map { "$it dp" to it },
@@ -238,6 +351,69 @@ fun SettingsScreen(onBack: () -> Unit) {
                 choice = null
             },
             onDismiss = { choice = null },
+        )
+    }
+
+    when (input) {
+        "su" -> InputDialog(
+            title = stringResource(R.string.settings_su_title),
+            label = "su",
+            initial = suCommand,
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                suCommand = typed.trim().ifBlank { "su" }
+                prefs.edit().putString(AppPrefs.KEY_SU, suCommand).apply()
+                RootShell.suCommand = suCommand
+                input = null
+            },
+            onDismiss = { input = null },
+        )
+
+        "dir" -> InputDialog(
+            title = stringResource(R.string.settings_dir_title),
+            label = FileRepository.DEFAULT_FILEMATE_DIR,
+            initial = workDir,
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                val dir = typed.trim().trimEnd('/').ifBlank { FileRepository.DEFAULT_FILEMATE_DIR }
+                // Folder kerja harus di penyimpanan internal, supaya semua alat bisa menulis ke sana
+                if (dir.startsWith(FileRepository.STORAGE_ROOT + "/")) {
+                    workDir = dir
+                    prefs.edit().putString(AppPrefs.KEY_WORK_DIR, dir).apply()
+                    FileRepository.FILEMATE_DIR = dir
+                } else {
+                    Toast.makeText(context, invalidDir, Toast.LENGTH_LONG).show()
+                }
+                input = null
+            },
+            onDismiss = { input = null },
+        )
+
+        "jar" -> InputDialog(
+            title = stringResource(R.string.settings_jar_title),
+            label = "minSdkVersion: 13-100",
+            initial = jarMinSdk.toString(),
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                // Di luar 13 sampai 100 dikembalikan ke batas terdekat
+                jarMinSdk = (typed.trim().toIntOrNull() ?: Jar2Dex.DEFAULT_MIN_SDK).coerceIn(13, 100)
+                prefs.edit().putInt(AppPrefs.KEY_JAR_MIN_SDK, jarMinSdk).apply()
+                input = null
+            },
+            onDismiss = { input = null },
+        )
+
+        "installer" -> InputDialog(
+            title = stringResource(R.string.settings_installer_title),
+            label = "com.android.vending",
+            initial = installer,
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                installer = typed.trim()
+                prefs.edit().putString(AppPrefs.KEY_INSTALLER, installer).apply()
+                input = null
+            },
+            onDismiss = { input = null },
         )
     }
 
@@ -254,6 +430,56 @@ fun SettingsScreen(onBack: () -> Unit) {
             },
         )
     }
+}
+
+/** Dialog Pengaturan tema seperti NP Manager: tombol bulat di kiri dan batang warna di kanan. */
+@Composable
+private fun ThemeDialog(
+    current: Int,
+    onPick: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(stringResource(R.string.settings_theme_title), fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                ThemeColors.OPTIONS.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selected = option },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = option == selected,
+                            onClick = { selected = option },
+                            colors = RadioButtonDefaults.colors(selectedColor = Accent),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Spacer(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(26.dp)
+                                .background(Color(option)),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onPick(selected) }) {
+                Text(stringResource(R.string.btn_ok), color = Accent, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel), color = Accent)
+            }
+        },
+    )
 }
 
 /** Dialog pilihan bulat (radio), dipakai untuk ukuran daftar, jumlah baris nama, dan margin bawah. */

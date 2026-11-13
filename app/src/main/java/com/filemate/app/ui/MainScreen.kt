@@ -127,6 +127,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.filemate.app.R
+import com.filemate.app.apk.Jar2Dex
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
@@ -148,6 +149,7 @@ fun MainScreen(
     onOpenApps: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenTool: (ToolKind, String?) -> Unit,
+    onOpenPreview: (PreviewTarget) -> Unit,
     vm: FileManagerViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -175,8 +177,16 @@ fun MainScreen(
             },
             nameLines = listPrefs.getInt(AppPrefs.KEY_NAME_LINES, 3).coerceIn(1, 8),
             thumbnails = listPrefs.getBoolean(AppPrefs.KEY_THUMBS, true),
+            thumbMaxBytes = listPrefs.getInt(AppPrefs.KEY_THUMB_MAX_MB, 10).coerceIn(1, 200) * 1024L * 1024L,
+            thumbTimeoutMs = listPrefs.getInt(AppPrefs.KEY_THUMB_TIMEOUT, 10).coerceIn(1, 120) * 1000L,
         )
     }
+    // Pengaturan lain yang dibaca ulang setiap kembali ke layar utama
+    val mdPreview = remember { listPrefs.getBoolean(AppPrefs.KEY_MD_PREVIEW, true) }
+    val htmlPreview = remember { listPrefs.getBoolean(AppPrefs.KEY_HTML_PREVIEW, true) }
+    val trashOn = remember { listPrefs.getBoolean(AppPrefs.KEY_TRASH_ON, true) }
+    val trashDefault = remember { listPrefs.getBoolean(AppPrefs.KEY_TRASH_DEFAULT, true) }
+    val deleteWarning = remember { listPrefs.getBoolean(AppPrefs.KEY_DELETE_WARNING, true) }
     val bottomMargin = remember { listPrefs.getInt(AppPrefs.KEY_BOTTOM_MARGIN, 0).coerceIn(0, 96) }
     // Dialog Layanan FTP, Layanan HTTP, atau Transfer LAN yang sedang terbuka
     var netDialog by remember { mutableStateOf<ToolKind?>(null) }
@@ -185,6 +195,9 @@ fun MainScreen(
     // Daftar APK/DEX di folder ini untuk dipilih alat "Analisis kelas"
     var classPickOpen by remember { mutableStateOf(false) }
     val noApkHere = stringResource(R.string.dex_no_file)
+    val jarWorking = stringResource(R.string.jar_working)
+    val jarDone = stringResource(R.string.jar_done)
+    val jarFailed = stringResource(R.string.jar_failed)
     val invalidPath = stringResource(R.string.msg_invalid_path)
     val notReadyName = stringResource(R.string.msg_invalid_name)
 
@@ -238,6 +251,15 @@ fun MainScreen(
                 vm.openApk(item.path)
             }
             // Berkas teks langsung dibuka di editor. Jenis lain memunculkan pilihan "Buka dengan", seperti NP Manager.
+            // Berkas MD dan HTML dibuka sebagai pratinjau jika pengaturannya dinyalakan
+            item.extension == "MD" && mdPreview -> {
+                vm.setActive(index)
+                onOpenPreview(PreviewTarget(item.path, markdown = true))
+            }
+            (item.extension == "HTML" || item.extension == "HTM") && htmlPreview -> {
+                vm.setActive(index)
+                onOpenPreview(PreviewTarget(item.path, markdown = false))
+            }
             item.extension in TEXT_EXT -> {
                 vm.setActive(index)
                 onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
@@ -520,8 +542,9 @@ fun MainScreen(
             onPick = { mode ->
                 done {
                     when (mode) {
-                        OpenMode.TEXT, OpenMode.XML, OpenMode.SVG, OpenMode.MARKDOWN ->
+                        OpenMode.TEXT, OpenMode.XML, OpenMode.SVG ->
                             onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
+                        OpenMode.MARKDOWN -> onOpenPreview(PreviewTarget(item.path, markdown = true))
                         OpenMode.HEX ->
                             onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode))
                         OpenMode.APK_INFO -> vm.openApk(item.path)
@@ -539,6 +562,24 @@ fun MainScreen(
                         OpenMode.PDF -> openFileAs(context, item, "application/pdf")
                         OpenMode.FONT -> openFileAs(context, item, "font/*")
                         OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
+                        // Fungsi Jar: mengubah JAR menjadi DEX di folder kerja Filemate
+                        OpenMode.JAR -> {
+                            vm.notify(jarWorking)
+                            scope.launch {
+                                val out = File(FileRepository.FILEMATE_DIR, item.name.substringBeforeLast('.') + "-dex")
+                                val minSdk = listPrefs.getInt(AppPrefs.KEY_JAR_MIN_SDK, Jar2Dex.DEFAULT_MIN_SDK)
+                                val ok = withContext(Dispatchers.IO) {
+                                    try {
+                                        Jar2Dex.convert(File(item.path), out, minSdk)
+                                        true
+                                    } catch (e: Throwable) {
+                                        false
+                                    }
+                                }
+                                vm.notify(if (ok) jarDone.format(out.path) else jarFailed)
+                                vm.reloadAll()
+                            }
+                        }
                         else -> vm.notify(notReady)
                     }
                 }
@@ -671,7 +712,9 @@ fun MainScreen(
                 action = action,
                 system = dialog.system,
                 single = single,
-                trashAvailable = deletePaths.isNotEmpty() && deletePaths.all { Trash.supports(it) },
+                trashAvailable = trashOn && deletePaths.isNotEmpty() && deletePaths.all { Trash.supports(it) },
+                trashDefault = trashDefault,
+                showWarning = deleteWarning,
                 onConfirm = { vm.confirmAction(it) },
                 onDismiss = { vm.dismissDialog() },
             )
@@ -683,6 +726,14 @@ fun MainScreen(
                 onUnpack = { vm.unpackApk() },
                 onRepack = { vm.repackApk() },
                 onSign = { vm.signApk() },
+                // Lewat root jika pengaturannya menyala dan root aktif, kalau tidak lewat pemasang Android
+                onInstall = {
+                    if (vm.installsWithRoot()) {
+                        vm.installApkRoot()
+                    } else {
+                        vm.installTarget()?.let { installWithSystem(context, it) }
+                    }
+                },
                 onDismiss = { vm.dismissApk() },
             )
         }

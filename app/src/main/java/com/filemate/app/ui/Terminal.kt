@@ -83,7 +83,7 @@ fun TerminalScreen(target: TerminalTarget, onBack: () -> Unit) {
             val output = withContext(Dispatchers.IO) {
                 try {
                     val script = "cd ${RootShell.quote(cwd)} 2>/dev/null\n$command\nprintf '\\n$PWD_MARK%s' \"\$PWD\""
-                    val process = ProcessBuilder(if (target.root) "su" else "sh", "-c", script)
+                    val process = ProcessBuilder((if (target.root) RootShell.suArgs() else listOf("sh")) + listOf("-c", script))
                         .redirectErrorStream(true)
                         .start()
                     running[0] = process

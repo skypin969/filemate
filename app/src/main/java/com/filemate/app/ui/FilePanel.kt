@@ -54,6 +54,7 @@ import com.filemate.app.data.FileRepository
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Satu panel berkas, tampilannya mengikuti NP Manager: baris ".." (jika ada folder induk),
@@ -131,7 +132,15 @@ fun folderTitle(path: String, storageLabel: String): String = when (path) {
  * Pilihan tampilan daftar dari halaman pengaturan: [scale] untuk ukuran (kecil, sedang, besar),
  * [nameLines] untuk jumlah baris nama berkas, dan [thumbnails] untuk gambar mini.
  */
-data class ListStyle(val scale: Float = 1f, val nameLines: Int = 3, val thumbnails: Boolean = true)
+data class ListStyle(
+    val scale: Float = 1f,
+    val nameLines: Int = 3,
+    val thumbnails: Boolean = true,
+    /** Gambar yang lebih besar dari ini (byte) tidak dibuatkan gambar mini. */
+    val thumbMaxBytes: Long = 10L * 1024 * 1024,
+    /** Gambar mini yang belum selesai dalam waktu ini (milidetik) dibatalkan. */
+    val thumbTimeoutMs: Long = 10_000L,
+)
 
 /** Folder yang isinya folder bernama paket aplikasi. */
 private fun isPackageParent(path: String): Boolean =
@@ -246,7 +255,8 @@ private fun FileIcon(item: FileItem, style: ListStyle, packageFolders: Boolean) 
 
         item.isApk -> ApkIcon(item.path, size)
 
-        style.thumbnails && item.extension in IMAGE_EXT -> ImageThumb(item.path, size)
+        style.thumbnails && item.extension in IMAGE_EXT && item.size <= style.thumbMaxBytes ->
+            ImageThumb(item.path, size, style.thumbTimeoutMs)
 
         // Berkas teks dan arsip punya bentuk ikon sendiri, warnanya tetap abu-abu gelap (tema hitam putih)
         item.extension in TEXT_EXT -> Icon(
@@ -280,10 +290,11 @@ private val packageIconCache = ConcurrentHashMap<String, ImageBitmap>()
 
 /** Gambar mini sebuah berkas gambar. Gambar dibaca dalam ukuran kecil supaya hemat memori. */
 @Composable
-private fun ImageThumb(path: String, size: Dp) {
+private fun ImageThumb(path: String, size: Dp, timeoutMs: Long) {
     val bitmap by produceState(initialValue = thumbCache[path], path) {
         if (value == null) {
-            value = withContext(Dispatchers.IO) { loadThumb(path) }
+            // Jika terlalu lama (misalnya berkas rusak), pemuatan dilepas dan ikon biasa yang tampil
+            value = withTimeoutOrNull(timeoutMs) { withContext(Dispatchers.IO) { loadThumb(path) } }
         }
     }
     val loaded = bitmap

@@ -22,6 +22,9 @@
     <!-- Pengukur desibel membaca kerasnya suara dari mikrofon -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Membuka layar pemasang Android untuk APK -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

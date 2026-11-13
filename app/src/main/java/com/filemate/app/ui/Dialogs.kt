@@ -147,6 +147,7 @@ fun NewItemDialog(
  * Dialog konfirmasi. Untuk hapus, tampil nama dan ukuran berkas serta pilihan "Pindah ke Recycle Bin"
  * seperti NP Manager. Untuk folder sistem, tombol baru aktif setelah user mencentang bahwa dia paham risikonya.
  * [single] diisi jika yang dihapus hanya satu berkas. [trashAvailable] false jika berkas tidak bisa masuk Recycle Bin.
+ * [trashDefault] dan [showWarning] berasal dari pengaturan Recycle Bin.
  */
 @Composable
 fun ConfirmDialog(
@@ -154,6 +155,8 @@ fun ConfirmDialog(
     system: Boolean,
     single: FileItem?,
     trashAvailable: Boolean,
+    trashDefault: Boolean,
+    showWarning: Boolean,
     onConfirm: (FileAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -177,7 +180,7 @@ fun ConfirmDialog(
     }
     val isDelete = action is FileAction.Delete
     var understood by remember { mutableStateOf(false) }
-    var toTrash by remember { mutableStateOf(trashAvailable) }
+    var toTrash by remember { mutableStateOf(trashAvailable && trashDefault) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -210,7 +213,7 @@ fun ConfirmDialog(
                     }
                 }
                 // Peringatan merah saat berkas akan dihapus selamanya
-                if (isDelete && !(trashAvailable && toTrash)) {
+                if (isDelete && showWarning && !(trashAvailable && toTrash)) {
                     Spacer(Modifier.height(4.dp))
                     Text(stringResource(R.string.delete_forever_warning), color = Danger, fontSize = 14.sp)
                 }
@@ -262,6 +265,7 @@ fun ApkDialog(
     onUnpack: () -> Unit,
     onRepack: () -> Unit,
     onSign: () -> Unit,
+    onInstall: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -336,6 +340,13 @@ fun ApkDialog(
                     ) {
                         Text(stringResource(R.string.apk_btn_sign), fontSize = 13.sp)
                     }
+                }
+                OutlinedButton(
+                    onClick = onInstall,
+                    enabled = !info.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.apk_btn_install), fontSize = 13.sp)
                 }
             }
         },

@@ -49,6 +49,19 @@ private fun mimeOf(item: FileItem): String =
 private fun uriOf(context: Context, item: FileItem) =
     FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(item.path))
 
+/** Membuka layar pemasang bawaan Android untuk sebuah APK. */
+fun installWithSystem(context: Context, path: String) {
+    try {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(path))
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+    }
+}
+
 /** Membuka berkas dengan aplikasi lain yang cocok di HP. */
 fun openFile(context: Context, item: FileItem) {
     try {

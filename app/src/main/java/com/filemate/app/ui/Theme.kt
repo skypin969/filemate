@@ -4,20 +4,58 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.filemate.app.R
 
-// Tema hitam putih: satu tampilan tetap (bukan mode gelap/terang). Bilah atas hitam, latar putih.
-// Satu-satunya warna lain adalah merah untuk tindakan hapus, supaya tidak tertukar.
-val Primary = Color(0xFF111111)       // bilah atas, layar pembuka
-val PrimaryDark = Color(0xFF111111)   // garis penanda panel aktif
-val Accent = Color(0xFF111111)        // tombol teks, judul bagian, sakelar
-val FolderColor = Color(0xFF2F2F2F)   // ikon folder
+/**
+ * Warna tema. Bawaannya hitam putih. Dari Pengaturan tema, user bisa mengganti warna utamanya
+ * (bilah atas, ikon folder, tombol). Latar tetap putih, tidak ada mode gelap.
+ */
+object ThemeColors {
+    const val DEFAULT = 0xFF111111.toInt()
+
+    /** Pilihan warna di dialog Pengaturan tema. Yang pertama adalah hitam bawaan Filemate. */
+    val OPTIONS: List<Int> = listOf(
+        0xFF111111, 0xFF409EFF, 0xFF5DBB7A, 0xFFE5A23D, 0xFFF56C6C, 0xFF8A9583, 0xFF606266, 0xFF303133,
+        0xFFFF5E9E, 0xFFFF0000, 0xFF9B1FFF, 0xFF002FA7, 0xFF81D8CF, 0xFF003152, 0xFF6667AB, 0xFF008982,
+        0xFFC30D2E, 0xFFAB5621, 0xFF470024, 0xFF4C0009, 0xFFE95A20, 0xFFFBD26A,
+    ).map { it.toInt() }
+
+    /** Warna utama yang sedang dipakai. Layar ikut berubah begitu nilainya diganti. */
+    var primary by mutableStateOf(DEFAULT)
+}
+
+/** Menggelapkan warna: 1 berarti tetap, 0 berarti hitam. */
+private fun darken(color: Color, factor: Float): Color =
+    Color(color.red * factor, color.green * factor, color.blue * factor)
+
+val Primary: Color get() = Color(ThemeColors.primary)      // bilah atas, layar pembuka
+
+val PrimaryDark: Color get() = darken(Primary, 0.7f)       // versi lebih gelap dari warna utama
+
+// Tombol teks, judul bagian, sakelar. Dibuat cukup gelap supaya tetap terbaca di latar putih,
+// juga saat warna tema yang dipilih terang (kuning, toska muda).
+val Accent: Color
+    get() {
+        if (ThemeColors.primary == ThemeColors.DEFAULT) return Primary
+        val base = darken(Primary, 0.75f)
+        return if (base.luminance() > 0.35f) darken(base, 0.6f) else base
+    }
+
+// Ikon folder: abu-abu gelap pada tema hitam putih, selain itu mengikuti warna tema
+val FolderColor: Color
+    get() = if (ThemeColors.primary == ThemeColors.DEFAULT) Color(0xFF2F2F2F) else Primary
+
 val SoftGray = Color(0xFFF5F5F5)      // latar kotak lembut
 val SelectTint = Color(0xFFE2E2E2)    // baris yang dipilih
 val IconBox = Color(0xFFEDEDED)       // kotak di belakang ikon menu samping
@@ -30,9 +68,9 @@ val Danger = Color(0xFFC62828)        // hapus
 val FileTint = Color(0xFF757575)      // ikon berkas biasa
 val MenuIcon = Color(0xFF424242)      // ikon di menu
 
-val HeaderBrush: Brush = SolidColor(Primary)
+val HeaderBrush: Brush get() = SolidColor(Primary)
 
-private val LightColors = lightColorScheme(
+private fun appColors() = lightColorScheme(
     primary = Accent,
     onPrimary = Color.White,
     primaryContainer = SelectTint,
@@ -83,5 +121,7 @@ private val AppTypography = Typography(
 
 @Composable
 fun FilemateTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LightColors, typography = AppTypography, content = content)
+    // Skema warna dibuat ulang setiap warna tema berganti
+    val colors = remember(ThemeColors.primary) { appColors() }
+    MaterialTheme(colorScheme = colors, typography = AppTypography, content = content)
 }

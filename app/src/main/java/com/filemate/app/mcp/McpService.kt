@@ -53,6 +53,7 @@ class McpService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        AppPrefs.applyStartup(this)
         val prefs = AppPrefs.of(this)
         val port = prefs.getInt(AppPrefs.KEY_MCP_PORT, DEFAULT_PORT)
         val lan = prefs.getBoolean(AppPrefs.KEY_MCP_LAN, false)

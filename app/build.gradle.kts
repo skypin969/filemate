@@ -56,4 +56,6 @@ dependencies {
     implementation("com.android.tools.build:apksig:8.7.3")
     // Pembaca berkas DEX, untuk alat Analisis kelas
     implementation("com.android.tools.smali:smali-dexlib2:3.0.3")
+    // D8, pengubah JAR menjadi DEX, untuk alat Jar2Dex
+    implementation("com.android.tools:r8:8.7.18")
 }

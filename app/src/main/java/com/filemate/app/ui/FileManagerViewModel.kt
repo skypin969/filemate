@@ -747,7 +747,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                     try {
                         val out = File(FileRepository.FILEMATE_DIR, "$base-rakit.apk")
                         ApkTools.repack(folder, out)
-                        text(R.string.msg_apk_repacked, out.path)
+                        // Pengaturan "Tanda tangan otomatis": hasil rakit langsung ditandatangani
+                        if (prefs.getBoolean(AppPrefs.KEY_AUTO_SIGN, true)) {
+                            val signed = File(FileRepository.FILEMATE_DIR, "$base-ttd.apk")
+                            ApkTools.sign(out, signed)
+                            text(R.string.msg_apk_signed, signed.path)
+                        } else {
+                            text(R.string.msg_apk_repacked, out.path)
+                        }
                     } catch (e: Exception) {
                         text(R.string.msg_apk_failed)
                     }
@@ -777,6 +784,42 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             }
             updateApk { it.copy(busy = false, status = status) }
             reloadAll()
+        }
+    }
+
+    /** APK yang akan dipasang: hasil tanda tangan jika ada, kalau tidak APK yang sedang dibuka. */
+    fun installTarget(): String? {
+        val path = _state.value.apk?.path ?: return null
+        val signed = File(FileRepository.FILEMATE_DIR, "${baseName(path)}-ttd.apk")
+        return if (signed.isFile) signed.path else path
+    }
+
+    /** True jika pemasangan harus lewat root (pengaturan dinyalakan dan root aktif). */
+    fun installsWithRoot(): Boolean =
+        _state.value.rootMode && prefs.getBoolean(AppPrefs.KEY_ROOT_INSTALL, true)
+
+    /** Memasang APK lewat root dengan perintah pm, tanpa layar pemasang Android. */
+    fun installApkRoot() {
+        val target = installTarget() ?: return
+        val installer = prefs.getString(AppPrefs.KEY_INSTALLER, "").orEmpty().trim()
+        updateApk { it.copy(busy = true, status = "") }
+        viewModelScope.launch {
+            val status = withContext(Dispatchers.IO) {
+                // pm tidak selalu bisa membaca penyimpanan internal, jadi APK disalin dulu ke folder sementara sistem
+                val temp = "/data/local/tmp/filemate_install.apk"
+                val source = RootShell.quote(target)
+                // Nama paket sumber hanya boleh huruf, angka, titik, dan garis bawah
+                val from = if (installer.matches(Regex("[A-Za-z0-9_.]+"))) "-i $installer " else ""
+                val result = RootShell.run(
+                    "cp $source $temp && chmod 644 $temp && pm install -r $from$temp; code=\$?; rm -f $temp; exit \$code",
+                )
+                if (result.exitCode == 0) {
+                    text(R.string.msg_apk_installed)
+                } else {
+                    text(R.string.msg_apk_install_failed, result.output.trim().takeLast(200))
+                }
+            }
+            updateApk { it.copy(busy = false, status = status) }
         }
     }
 

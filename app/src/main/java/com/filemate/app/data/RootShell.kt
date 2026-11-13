@@ -10,9 +10,17 @@ data class ShellResult(val exitCode: Int, val output: String)
  */
 object RootShell {
 
+    /** Perintah untuk mendapat akses root. Bisa diganti di Pengaturan, misalnya "su --mount-master". */
+    @Volatile
+    var suCommand: String = "su"
+
+    /** Perintah su dipecah per kata, siap dipakai untuk menjalankan proses. */
+    fun suArgs(): List<String> =
+        suCommand.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.ifEmpty { listOf("su") }
+
     fun run(command: String): ShellResult {
         return try {
-            val process = ProcessBuilder("su", "-c", command)
+            val process = ProcessBuilder(suArgs() + listOf("-c", command))
                 .redirectErrorStream(true)
                 .start()
             val output = process.inputStream.bufferedReader().use { it.readText() }

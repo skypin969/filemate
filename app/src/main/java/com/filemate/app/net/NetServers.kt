@@ -107,7 +107,7 @@ object NetServers {
     const val FTP_USER = "filemate"
 
     /** Folder tempat berkas kiriman Transfer LAN disimpan. */
-    val receiveDir = File(FileRepository.FILEMATE_DIR, "Terima")
+    val receiveDir: File get() = File(FileRepository.FILEMATE_DIR, "Terima")
 
     private val status = MutableStateFlow(NetStatus())
     val state: StateFlow<NetStatus> = status.asStateFlow()

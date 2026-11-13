@@ -31,9 +31,25 @@ fun FilemateApp() {
     // Alat dari menu samping yang tampil sebagai layar penuh. Isi kedua adalah berkas yang dibuka (jika ada).
     var tool by remember { mutableStateOf<Pair<ToolKind, String?>?>(null) }
 
+    // Pratinjau berkas HTML atau Markdown
+    var preview by remember { mutableStateOf<PreviewTarget?>(null) }
+
     val shell = terminal
     if (shell != null) {
         TerminalScreen(target = shell, onBack = { terminal = null })
+        return
+    }
+
+    val shown = preview
+    if (shown != null) {
+        PreviewScreen(
+            target = shown,
+            onBack = { preview = null },
+            onEdit = {
+                preview = null
+                editor = EditorTarget(shown.path, hex = false, root = false)
+            },
+        )
         return
     }
 
@@ -75,6 +91,7 @@ fun FilemateApp() {
             onOpenApps = { screen = Screen.APPS },
             onOpenTrash = { screen = Screen.TRASH },
             onOpenTool = { kind, path -> tool = Pair(kind, path) },
+            onOpenPreview = { preview = it },
         )
 
         Screen.TRASH -> TrashScreen(onBack = { screen = Screen.MAIN })
