@@ -9,12 +9,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.filemate.app"
+        applicationId = "com.skypin.filemate"
         // Akses semua berkas (MANAGE_EXTERNAL_STORAGE) tersedia mulai Android 11
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 969
+        versionName = "9.6.9"
     }
 
     buildTypes {

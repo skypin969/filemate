@@ -151,7 +151,7 @@
     <string name="settings_other_header">Other</string>
     <string name="settings_about">About Filemate</string>
     <string name="about_title">About Filemate</string>
-    <string name="about_body">Version 1.0. A dual-panel file manager with APK tools, text and hex editors, a terminal, and an app manager.</string>
+    <string name="about_body">Version 9.6.9. A dual-panel file manager with APK tools, text and hex editors, a terminal, and an app manager.</string>
 
     <!-- Navigation drawer -->
     <string name="drawer_bookmarks">Bookmarks</string>

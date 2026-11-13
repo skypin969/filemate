@@ -151,7 +151,7 @@
     <string name="settings_other_header">Lainnya</string>
     <string name="settings_about">Tentang Filemate</string>
     <string name="about_title">Tentang Filemate</string>
-    <string name="about_body">Versi 1.0. File manager dua panel dengan alat APK, editor teks dan heksadesimal, terminal, dan manajemen aplikasi.</string>
+    <string name="about_body">Versi 9.6.9. File manager dua panel dengan alat APK, editor teks dan heksadesimal, terminal, dan manajemen aplikasi.</string>
 
     <!-- Menu samping -->
     <string name="drawer_bookmarks">Bookmark</string>
