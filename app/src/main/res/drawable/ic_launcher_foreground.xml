@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ikon Filemate: folder putih dengan garis tengah (dua panel) di atas latar hitam -->
+<!-- Ikon Filemate: folder putih dengan huruf F gaya logo Flashmate di atas latar hitam -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -9,6 +9,9 @@
         android:fillColor="#FFFFFFFF"
         android:pathData="M30,38a4,4 0,0 1,4 -4h13l5,5h22a4,4 0,0 1,4 4v27a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4z" />
     <path
-        android:fillColor="#FF111111"
-        android:pathData="M52.75,46h2.5v21h-2.5z" />
+        android:strokeColor="#FF111111"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40.3,57.4C41.1,55.5 43.3,55.4 44,57.3L47.3,66.6L53.5,48.6Q54.1,46.9 55.9,46.9H67.7M57,57H65" />
 </vector>
