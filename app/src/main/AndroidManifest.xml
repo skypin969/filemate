@@ -19,6 +19,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Pengukur desibel membaca kerasnya suara dari mikrofon -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -57,6 +60,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Server MCP lokal yang dijalankan user untuk dihubungkan ke aplikasi AI" />
+        </service>
+
+        <!-- Menjaga server FTP/HTTP dan perekam aktivitas tetap hidup di latar belakang -->
+        <service
+            android:name=".net.KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Server berkas lokal dan perekam aktivitas yang dijalankan user" />
         </service>
 
         <!-- Menyimpan pilihan bahasa aplikasi (Indonesia / English) -->

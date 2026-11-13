@@ -43,8 +43,12 @@ data class McpStatus(
  */
 class McpService : Service() {
 
+    @Volatile
     private var server: McpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    @Volatile
+    private var starting = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -61,23 +65,29 @@ class McpService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        if (server == null) {
-            try {
-                val created = McpServer(applicationContext, port, lan) { tool, millis, ok ->
-                    val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-                    val line = "$time  $tool  ${millis}ms  ${if (ok) "OK" else "GAGAL"}"
-                    status.update { it.copy(history = (listOf(line) + it.history).take(200)) }
+        if (server == null && !starting) {
+            starting = true
+            // Membuka port dilakukan di luar thread utama, karena Android melarang kerja jaringan di sana
+            Thread {
+                try {
+                    val created = McpServer(applicationContext, port, lan) { tool, millis, ok ->
+                        val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+                        val line = "$time  $tool  ${millis}ms  ${if (ok) "OK" else "GAGAL"}"
+                        status.update { it.copy(history = (listOf(line) + it.history).take(200)) }
+                    }
+                    created.start()
+                    server = created
+                    // Menjaga prosesor tetap bekerja saat layar mati, supaya sambungan AI tidak putus
+                    val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "filemate:mcp").also { it.acquire() }
+                    status.update { it.copy(running = true, port = port, lan = lan, error = null) }
+                } catch (e: Exception) {
+                    status.update { it.copy(running = false, error = e.message ?: e.javaClass.simpleName) }
+                    stopSelf()
+                } finally {
+                    starting = false
                 }
-                created.start()
-                server = created
-                // Menjaga prosesor tetap bekerja saat layar mati, supaya sambungan AI tidak putus
-                val power = getSystemService(Context.POWER_SERVICE) as PowerManager
-                wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "filemate:mcp").also { it.acquire() }
-                status.update { it.copy(running = true, port = port, lan = lan, error = null) }
-            } catch (e: Exception) {
-                status.update { it.copy(running = false, error = e.message ?: e.javaClass.simpleName) }
-                stopSelf()
-            }
+            }.start()
         }
         return START_STICKY
     }

@@ -28,9 +28,32 @@ fun FilemateApp() {
         return
     }
 
+    // Alat dari menu samping yang tampil sebagai layar penuh. Isi kedua adalah berkas yang dibuka (jika ada).
+    var tool by remember { mutableStateOf<Pair<ToolKind, String?>?>(null) }
+
     val shell = terminal
     if (shell != null) {
         TerminalScreen(target = shell, onBack = { terminal = null })
+        return
+    }
+
+    val openTool = tool
+    if (openTool != null) {
+        val close = { tool = null }
+        when (openTool.first) {
+            ToolKind.TOOLBOX -> ToolboxScreen(close)
+            ToolKind.TIMESTAMP -> TimestampScreen(close)
+            ToolKind.SMALI -> SmaliQueryScreen(close)
+            ToolKind.RULER -> RulerScreen(close)
+            ToolKind.NETWORK -> NetworkToolsScreen(close)
+            ToolKind.DECIBEL -> DecibelScreen(close)
+            ToolKind.ACTIVITY -> ActivityRecordScreen(close)
+            ToolKind.LAYOUT -> LayoutViewerScreen(close)
+            ToolKind.COLOR -> ColorPickerScreen(close)
+            ToolKind.CLASSES -> ClassAnalysisScreen(openTool.second.orEmpty(), close)
+            // FTP, HTTP, dan Transfer LAN berupa dialog di layar utama, bukan layar penuh
+            else -> tool = null
+        }
         return
     }
 
@@ -51,6 +74,7 @@ fun FilemateApp() {
             onOpenTerminal = { terminal = it },
             onOpenApps = { screen = Screen.APPS },
             onOpenTrash = { screen = Screen.TRASH },
+            onOpenTool = { kind, path -> tool = Pair(kind, path) },
         )
 
         Screen.TRASH -> TrashScreen(onBack = { screen = Screen.MAIN })

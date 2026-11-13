@@ -54,4 +54,6 @@ dependencies {
 
     // Library penanda tangan APK dari Android (sama seperti yang dipakai Android Studio)
     implementation("com.android.tools.build:apksig:8.7.3")
+    // Pembaca berkas DEX, untuk alat Analisis kelas
+    implementation("com.android.tools.smali:smali-dexlib2:3.0.3")
 }

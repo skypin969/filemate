@@ -132,7 +132,9 @@ import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
 import com.filemate.app.data.Trash
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Layar utama, tampilannya mengikuti NP Manager: bilah atas biru berisi jalur folder,
@@ -145,6 +147,7 @@ fun MainScreen(
     onOpenTerminal: (TerminalTarget) -> Unit,
     onOpenApps: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenTool: (ToolKind, String?) -> Unit,
     vm: FileManagerViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -159,6 +162,14 @@ fun MainScreen(
     var openWithTarget by remember { mutableStateOf<FileItem?>(null) }
     val notReady = stringResource(R.string.msg_not_ready)
     var mcpOpen by remember { mutableStateOf(false) }
+    // Dialog Layanan FTP, Layanan HTTP, atau Transfer LAN yang sedang terbuka
+    var netDialog by remember { mutableStateOf<ToolKind?>(null) }
+    // Dialog nama berkas baru untuk alat "Editor teks"
+    var newTextOpen by remember { mutableStateOf(false) }
+    // Daftar APK/DEX di folder ini untuk dipilih alat "Analisis kelas"
+    var classPickOpen by remember { mutableStateOf(false) }
+    val noApkHere = stringResource(R.string.dex_no_file)
+    val notReadyName = stringResource(R.string.msg_invalid_name)
 
     // Tombol kembali: tutup menu, lalu tutup pencarian/pilihan, lalu naik satu folder, lalu keluar
     BackHandler {
@@ -260,6 +271,25 @@ fun MainScreen(
                 onMcp = {
                     scope.launch { drawerState.close() }
                     mcpOpen = true
+                },
+                onTool = { kind ->
+                    scope.launch { drawerState.close() }
+                    when (kind) {
+                        ToolKind.FTP, ToolKind.HTTP, ToolKind.LAN -> netDialog = kind
+                        ToolKind.CLASSES -> {
+                            val candidates = active.items.filter { it.isApk || it.extension == "DEX" }
+                            when (candidates.size) {
+                                0 -> vm.notify(noApkHere)
+                                1 -> onOpenTool(ToolKind.CLASSES, candidates[0].path)
+                                else -> classPickOpen = true
+                            }
+                        }
+                        else -> onOpenTool(kind, null)
+                    }
+                },
+                onNewText = {
+                    scope.launch { drawerState.close() }
+                    newTextOpen = true
                 },
                 onNotReady = {
                     scope.launch { drawerState.close() }
@@ -488,6 +518,7 @@ fun MainScreen(
                         OpenMode.MUSIC -> openFileAs(context, item, "audio/*")
                         OpenMode.PDF -> openFileAs(context, item, "application/pdf")
                         OpenMode.FONT -> openFileAs(context, item, "font/*")
+                        OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
                         else -> vm.notify(notReady)
                     }
                 }
@@ -497,6 +528,70 @@ fun MainScreen(
 
     if (mcpOpen) {
         McpDialog(onDismiss = { mcpOpen = false })
+    }
+
+    netDialog?.let { kind ->
+        NetServiceDialog(kind = kind, onDismiss = { netDialog = null })
+    }
+
+    // Alat "Editor teks": membuat berkas teks baru di folder yang sedang dibuka, lalu langsung membukanya
+    if (newTextOpen) {
+        InputDialog(
+            title = stringResource(R.string.tool_text_editor),
+            label = stringResource(R.string.new_text_hint),
+            initial = "",
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                newTextOpen = false
+                val name = typed.trim()
+                val target = FileRepository.join(active.path, name)
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) {
+                        name.isNotEmpty() && !name.contains('/') &&
+                            (File(target).exists() || FileRepository.createFile(active.path, name, state.rootMode))
+                    }
+                    if (ok) {
+                        vm.reloadAll()
+                        onOpenEditor(EditorTarget(target, hex = false, root = state.rootMode))
+                    } else {
+                        vm.notify(notReadyName)
+                    }
+                }
+            },
+            onDismiss = { newTextOpen = false },
+        )
+    }
+
+    if (classPickOpen) {
+        val candidates = active.items.filter { it.isApk || it.extension == "DEX" }
+        AlertDialog(
+            onDismissRequest = { classPickOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.tool_class_analysis), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    candidates.forEach { item ->
+                        Text(
+                            text = item.name,
+                            color = Ink,
+                            fontSize = 15.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    classPickOpen = false
+                                    onOpenTool(ToolKind.CLASSES, item.path)
+                                }
+                                .padding(vertical = 10.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { classPickOpen = false }) {
+                    Text(stringResource(R.string.btn_cancel), color = Accent)
+                }
+            },
+        )
     }
 
     if (sortOpen) {
@@ -1183,6 +1278,8 @@ private fun DrawerSheet(
     onTerminal: () -> Unit,
     onTrash: () -> Unit,
     onMcp: () -> Unit,
+    onTool: (ToolKind) -> Unit,
+    onNewText: () -> Unit,
     onNotReady: () -> Unit,
 ) {
     val storageLabel = stringResource(R.string.title_storage)
@@ -1194,25 +1291,25 @@ private fun DrawerSheet(
     // Urutan mengikuti NP Manager. Yang belum dibuat menampilkan pesan saat diketuk.
     val tools = listOf(
         DrawerTool(R.string.tool_apps, Icons.Filled.Layers, onApps),
-        DrawerTool(R.string.tool_toolbox, Icons.Filled.Build, null),
+        DrawerTool(R.string.tool_toolbox, Icons.Filled.Build, { onTool(ToolKind.TOOLBOX) }),
         DrawerTool(R.string.tool_apk_mcp, Icons.Filled.SmartToy, onMcp),
-        DrawerTool(R.string.tool_ftp, Icons.Filled.Cloud, null),
-        DrawerTool(R.string.tool_http, Icons.Filled.Language, null),
-        DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, null),
+        DrawerTool(R.string.tool_ftp, Icons.Filled.Cloud, { onTool(ToolKind.FTP) }),
+        DrawerTool(R.string.tool_http, Icons.Filled.Language, { onTool(ToolKind.HTTP) }),
+        DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, { onTool(ToolKind.LAN) }),
         DrawerTool(R.string.tool_recycle, Icons.Filled.Delete, onTrash),
         DrawerTool(R.string.tool_java2smali, Icons.Filled.Coffee, null),
-        DrawerTool(R.string.tool_smali_query, Icons.Filled.Description, null),
-        DrawerTool(R.string.tool_network, Icons.Filled.Public, null),
+        DrawerTool(R.string.tool_smali_query, Icons.Filled.Description, { onTool(ToolKind.SMALI) }),
+        DrawerTool(R.string.tool_network, Icons.Filled.Public, { onTool(ToolKind.NETWORK) }),
         DrawerTool(R.string.tool_terminal, Icons.Filled.Terminal, onTerminal),
-        DrawerTool(R.string.tool_activity_record, Icons.Filled.TrackChanges, null),
-        DrawerTool(R.string.tool_layout_viewer, Icons.Filled.ViewQuilt, null),
-        DrawerTool(R.string.tool_color_picker, Icons.Filled.Colorize, null),
-        DrawerTool(R.string.tool_ruler, Icons.Filled.Straighten, null),
-        DrawerTool(R.string.tool_decibel, Icons.Filled.GraphicEq, null),
-        DrawerTool(R.string.tool_text_editor, Icons.Filled.EditNote, null),
+        DrawerTool(R.string.tool_activity_record, Icons.Filled.TrackChanges, { onTool(ToolKind.ACTIVITY) }),
+        DrawerTool(R.string.tool_layout_viewer, Icons.Filled.ViewQuilt, { onTool(ToolKind.LAYOUT) }),
+        DrawerTool(R.string.tool_color_picker, Icons.Filled.Colorize, { onTool(ToolKind.COLOR) }),
+        DrawerTool(R.string.tool_ruler, Icons.Filled.Straighten, { onTool(ToolKind.RULER) }),
+        DrawerTool(R.string.tool_decibel, Icons.Filled.GraphicEq, { onTool(ToolKind.DECIBEL) }),
+        DrawerTool(R.string.tool_text_editor, Icons.Filled.EditNote, onNewText),
         DrawerTool(R.string.tool_reflection, Icons.Filled.Code, null),
-        DrawerTool(R.string.tool_class_analysis, Icons.Filled.Handyman, null),
-        DrawerTool(R.string.tool_timestamp, Icons.Filled.Schedule, null),
+        DrawerTool(R.string.tool_class_analysis, Icons.Filled.Handyman, { onTool(ToolKind.CLASSES) }),
+        DrawerTool(R.string.tool_timestamp, Icons.Filled.Schedule, { onTool(ToolKind.TIMESTAMP) }),
     )
 
     ModalDrawerSheet(
