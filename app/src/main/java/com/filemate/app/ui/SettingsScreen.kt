@@ -30,6 +30,8 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -83,6 +85,15 @@ fun SettingsScreen(onBack: () -> Unit) {
     var input by remember { mutableStateOf<String?>(null) }
     val invalidDir = stringResource(R.string.settings_dir_invalid)
     var jarMinSdk by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_JAR_MIN_SDK, Jar2Dex.DEFAULT_MIN_SDK)) }
+    var homeLeft by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME_LEFT, "").orEmpty()) }
+    var homeRight by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME_RIGHT, "").orEmpty()) }
+    var dateFormat by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_DATE_FORMAT, 0)) }
+    var trashDays by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_TRASH_DAYS, 0)) }
+    // Dialog pengatur urutan yang sedang terbuka: "menu" atau "open"
+    var reorder by remember { mutableStateOf<String?>(null) }
+    val homeLabel = stringResource(R.string.settings_start_home)
+    var keepTime by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_KEEP_TIME, true)) }
+    val neverLabel = stringResource(R.string.settings_trash_never)
 
     /** Sakelar sederhana yang nilainya langsung disimpan. */
     @Composable
@@ -151,6 +162,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                 },
             )
 
+            SettingRow(
+                title = stringResource(R.string.settings_start_left),
+                subtitle = homeLeft.ifEmpty { homeLabel },
+                onClick = { input = "left" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_start_right),
+                subtitle = homeRight.ifEmpty { homeLabel },
+                onClick = { input = "right" },
+            )
+
             SectionTitle(stringResource(R.string.settings_display_header))
             SettingRow(
                 title = stringResource(R.string.settings_theme_title),
@@ -184,6 +206,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onClick = { choice = "margin" },
             )
             SettingRow(
+                title = stringResource(R.string.settings_date_format),
+                subtitle = DateFormats.PATTERNS.getOrElse(dateFormat) { DateFormats.PATTERNS[0] },
+                onClick = { choice = "date" },
+            )
+            Toggle(AppPrefs.KEY_HIDE_PERMS, false, R.string.settings_hide_perms_title, R.string.settings_hide_perms_desc)
+            SettingRow(
                 title = stringResource(R.string.settings_thumbs_title),
                 subtitle = stringResource(R.string.settings_thumbs_desc),
                 checked = thumbs,
@@ -202,6 +230,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 subtitle = stringResource(R.string.settings_thumb_time_desc, thumbTime),
                 onClick = { choice = "thumbtime" },
             )
+            Toggle(AppPrefs.KEY_THUMBS_EXTERNAL, true, R.string.settings_thumbs_external_title, R.string.settings_thumbs_external_desc)
 
             SectionTitle(stringResource(R.string.settings_editor_header))
             Toggle(AppPrefs.KEY_MD_PREVIEW, true, R.string.settings_md_preview, null)
@@ -223,14 +252,41 @@ fun SettingsScreen(onBack: () -> Unit) {
                 subtitle = workDir,
                 onClick = { input = "dir" },
             )
+            SettingRow(
+                title = stringResource(R.string.settings_keep_time_title),
+                subtitle = stringResource(R.string.settings_keep_time_desc),
+                checked = keepTime,
+                onClick = {
+                    keepTime = !keepTime
+                    prefs.edit().putBoolean(AppPrefs.KEY_KEEP_TIME, keepTime).apply()
+                    FileRepository.keepTime = keepTime
+                },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_menu_order_title),
+                subtitle = stringResource(R.string.settings_order_desc),
+                onClick = { reorder = "menu" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_open_order_title),
+                subtitle = stringResource(R.string.settings_order_desc),
+                onClick = { reorder = "open" },
+            )
 
             SectionTitle(stringResource(R.string.tool_recycle))
             Toggle(AppPrefs.KEY_TRASH_ON, true, R.string.settings_trash_on_title, R.string.settings_trash_on_desc)
             Toggle(AppPrefs.KEY_TRASH_DEFAULT, true, R.string.settings_trash_default_title, R.string.settings_trash_default_desc)
             Toggle(AppPrefs.KEY_DELETE_WARNING, true, R.string.settings_warning_title, R.string.settings_warning_desc)
+            SettingRow(
+                title = stringResource(R.string.settings_trash_days_title),
+                subtitle = if (trashDays <= 0) neverLabel else stringResource(R.string.settings_trash_days_value, trashDays),
+                onClick = { choice = "trashdays" },
+            )
 
             SectionTitle(stringResource(R.string.settings_apk_header))
             Toggle(AppPrefs.KEY_AUTO_SIGN, true, R.string.settings_auto_sign, null)
+            Toggle(AppPrefs.KEY_VERIFY_INSTALL, true, R.string.settings_verify_install_title, R.string.settings_verify_install_desc)
+            Toggle(AppPrefs.KEY_INSTALL_CONFIRM, false, R.string.settings_install_confirm_title, R.string.settings_install_confirm_desc)
             Toggle(AppPrefs.KEY_ROOT_INSTALL, true, R.string.settings_root_install_title, R.string.settings_root_install_desc)
             SettingRow(
                 title = stringResource(R.string.settings_installer_title),
@@ -341,6 +397,33 @@ fun SettingsScreen(onBack: () -> Unit) {
             onDismiss = { choice = null },
         )
 
+        "date" -> ChoiceDialog(
+            title = stringResource(R.string.settings_date_format),
+            options = DateFormats.PATTERNS.mapIndexed { index, pattern -> pattern to index },
+            current = dateFormat,
+            onPick = {
+                dateFormat = it
+                prefs.edit().putInt(AppPrefs.KEY_DATE_FORMAT, it).apply()
+                DateFormats.selected = it
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "trashdays" -> ChoiceDialog(
+            title = stringResource(R.string.settings_trash_days_title),
+            options = listOf(0, 1, 3, 7, 14, 30, 60, 90).map { days ->
+                (if (days == 0) neverLabel else stringResource(R.string.settings_trash_days_value, days)) to days
+            },
+            current = trashDays,
+            onPick = {
+                trashDays = it
+                prefs.edit().putInt(AppPrefs.KEY_TRASH_DAYS, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
         "margin" -> ChoiceDialog(
             title = stringResource(R.string.settings_bottom_margin),
             options = listOf(0, 8, 16, 24, 32, 48).map { "$it dp" to it },
@@ -389,6 +472,27 @@ fun SettingsScreen(onBack: () -> Unit) {
             onDismiss = { input = null },
         )
 
+        // Jalur startup tiap panel. Dikosongkan berarti mengikuti beranda.
+        "left", "right" -> {
+            val left = input == "left"
+            StartPathDialog(
+                title = stringResource(if (left) R.string.settings_start_left else R.string.settings_start_right),
+                initial = if (left) homeLeft else homeRight,
+                onConfirm = { typed ->
+                    val path = typed.trim().let { if (it.length > 1) it.trimEnd('/') else it }
+                    val key = if (left) AppPrefs.KEY_HOME_LEFT else AppPrefs.KEY_HOME_RIGHT
+                    if (path.isEmpty() || (path.startsWith(FileRepository.STORAGE_ROOT) && java.io.File(path).isDirectory)) {
+                        if (left) homeLeft = path else homeRight = path
+                        prefs.edit().putString(key, path).apply()
+                    } else {
+                        Toast.makeText(context, invalidDir, Toast.LENGTH_LONG).show()
+                    }
+                    input = null
+                },
+                onDismiss = { input = null },
+            )
+        }
+
         "jar" -> InputDialog(
             title = stringResource(R.string.settings_jar_title),
             label = "minSdkVersion: 13-100",
@@ -414,6 +518,40 @@ fun SettingsScreen(onBack: () -> Unit) {
                 input = null
             },
             onDismiss = { input = null },
+        )
+    }
+
+    when (reorder) {
+        "menu" -> ReorderDialog(
+            title = stringResource(R.string.settings_menu_order_title),
+            items = MenuOrder.load(context).mapNotNull { key ->
+                MenuOrder.ITEMS.firstOrNull { it.first == key }?.let { key to stringResource(it.second) }
+            },
+            onSave = {
+                MenuOrder.save(context, it)
+                reorder = null
+            },
+            onReset = {
+                prefs.edit().remove(AppPrefs.KEY_MENU_ORDER).apply()
+                reorder = null
+            },
+            onDismiss = { reorder = null },
+        )
+
+        "open" -> ReorderDialog(
+            title = stringResource(R.string.settings_open_order_title),
+            items = OpenDefaults.order(context).mapNotNull { name ->
+                OpenDefaults.ITEMS.firstOrNull { it.first == name }?.let { name to stringResource(it.second) }
+            },
+            onSave = {
+                OpenDefaults.saveOrder(context, it)
+                reorder = null
+            },
+            onReset = {
+                prefs.edit().remove(AppPrefs.KEY_OPEN_ORDER).apply()
+                reorder = null
+            },
+            onDismiss = { reorder = null },
         )
     }
 
@@ -578,4 +716,48 @@ private fun LanguageRow(label: String, selected: Boolean, onSelect: () -> Unit) 
 
 private fun setLanguage(tag: String) {
     AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+}
+
+/** Dialog jalur startup satu panel. Kolomnya boleh dikosongkan, yang berarti panel dibuka di beranda. */
+@Composable
+private fun StartPathDialog(
+    title: String,
+    initial: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var value by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column {
+                TextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    placeholder = { Text(FileRepository.STORAGE_ROOT) },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Accent,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.settings_start_hint), color = Muted, fontSize = 13.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }) {
+                Text(stringResource(R.string.btn_ok), color = Accent, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel), color = Accent)
+            }
+        },
+    )
 }

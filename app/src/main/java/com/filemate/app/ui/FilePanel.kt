@@ -84,6 +84,12 @@ fun FilePanel(
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Primary)
         }
 
+        // Pengaturan "Muat gambar mini dari penyimpanan eksternal": bisa dimatikan untuk flashdisk dan kartu SD
+        val rowStyle = if (!style.thumbsExternal && style.thumbnails && Volumes.find(panel.path) != null) {
+            style.copy(thumbnails = false)
+        } else {
+            style
+        }
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (parentPath != null) {
                 item(key = "parent") {
@@ -106,7 +112,7 @@ fun FilePanel(
                     item = item,
                     selected = item.path in panel.selected,
                     fresh = item.path in fresh,
-                    style = style,
+                    style = rowStyle,
                     // Di folder data aplikasi, folder bernama paket diberi ikon aplikasinya
                     packageFolders = isPackageParent(panel.path),
                     onClick = {
@@ -146,6 +152,8 @@ data class ListStyle(
     val thumbTimeoutMs: Long = 10_000L,
     /** Menampilkan izin (rwx) di bawah nama berkas pada folder sistem. */
     val showPerms: Boolean = true,
+    /** Gambar mini juga dimuat di flashdisk dan kartu SD. */
+    val thumbsExternal: Boolean = true,
 )
 
 /** Folder yang isinya folder bernama paket aplikasi. */

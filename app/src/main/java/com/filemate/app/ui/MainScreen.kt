@@ -1,6 +1,8 @@
 package com.filemate.app.ui
 
 import android.app.Activity
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.UnfoldMore
@@ -194,6 +196,8 @@ fun MainScreen(
             thumbnails = listPrefs.getBoolean(AppPrefs.KEY_THUMBS, true),
             thumbMaxBytes = listPrefs.getInt(AppPrefs.KEY_THUMB_MAX_MB, 10).coerceIn(1, 200) * 1024L * 1024L,
             thumbTimeoutMs = listPrefs.getInt(AppPrefs.KEY_THUMB_TIMEOUT, 10).coerceIn(1, 120) * 1000L,
+            showPerms = !listPrefs.getBoolean(AppPrefs.KEY_HIDE_PERMS, false),
+            thumbsExternal = listPrefs.getBoolean(AppPrefs.KEY_THUMBS_EXTERNAL, true),
         )
     }
     // Pengaturan lain yang dibaca ulang setiap kembali ke layar utama
@@ -219,6 +223,18 @@ fun MainScreen(
     var pendingTool by remember { mutableStateOf<Pair<FileTool, FileItem>?>(null) }
     val openFailed = stringResource(R.string.msg_cannot_open)
     val defaultSaved = stringResource(R.string.open_default_saved)
+    // Peringatan yang harus disetujui sebelum APK dipasang. Null jika tidak ada dialog.
+    var installAsk by remember { mutableStateOf<List<String>?>(null) }
+    val menuOrder = remember { MenuOrder.load(context) }
+
+    fun doInstall() {
+        // Lewat root jika pengaturannya menyala dan root aktif, kalau tidak lewat pemasang Android
+        if (vm.installsWithRoot()) {
+            vm.installApkRoot()
+        } else {
+            vm.installTarget()?.let { installWithSystem(context, it) }
+        }
+    }
     val rangeHint = stringResource(R.string.msg_range_hint)
     val shortcutAsked = stringResource(R.string.msg_shortcut_asked)
     val shortcutFailed = stringResource(R.string.msg_shortcut_failed)
@@ -309,6 +325,8 @@ fun MainScreen(
             OpenMode.PDF -> openFileAs(context, item, "application/pdf")
             OpenMode.FONT -> onOpenTool(ToolKind.FONT, item.path)
             OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
+            // Importir tanda tangan: berkas kunci disalin ke folder kunci Filemate
+            OpenMode.SIGNATURE -> vm.importKey(item.path)
             // Fungsi Jar: mengubah JAR menjadi DEX di folder kerja Filemate
             OpenMode.JAR -> {
                 vm.notify(jarWorking)
@@ -610,6 +628,7 @@ fun MainScreen(
             multi = targets.size > 1,
             // Di dalam arsip hanya bisa menyalin keluar
             inArchive = Archive.inside(item.path),
+            order = menuOrder,
             // Panel kiri menyalin ke kanan, panel kanan menyalin ke kiri
             towardRight = index == 0,
             dual = state.dual,
@@ -791,6 +810,35 @@ fun MainScreen(
         )
     }
 
+    installAsk?.let { warnings ->
+        AlertDialog(
+            onDismissRequest = { installAsk = null },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.apk_btn_install), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    warnings.forEach { warning ->
+                        Text(text = warning, color = Danger, fontSize = 14.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                    Text(stringResource(R.string.install_confirm_body), color = Ink, fontSize = 14.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    installAsk = null
+                    doInstall()
+                }) {
+                    Text(stringResource(R.string.btn_ok), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { installAsk = null }) {
+                    Text(stringResource(R.string.btn_cancel), color = Accent)
+                }
+            },
+        )
+    }
+
     // Dialog "Peralatan" dari menu tekan lama
     toolTargets?.let { targets ->
         FileToolsDialog(
@@ -814,22 +862,29 @@ fun MainScreen(
 
     // Isian lanjutan untuk alat yang butuh ukuran potongan atau kata sandi
     pendingTool?.let { (tool, item) ->
-        val split = tool == FileTool.SPLIT
-        InputDialog(
-            title = stringResource(tool.label),
-            label = stringResource(if (split) R.string.ftool_split_hint else R.string.ftool_password_hint),
-            initial = if (split) "10" else "",
-            confirmText = stringResource(R.string.btn_ok),
-            onConfirm = { typed ->
-                pendingTool = null
-                when (tool) {
-                    FileTool.SPLIT -> vm.splitFile(item.path, typed.toIntOrNull()?.coerceIn(1, 4096) ?: 10)
-                    FileTool.ENCRYPT -> vm.encryptFile(item.path, typed)
-                    else -> vm.decryptFile(item.path, typed)
-                }
-            },
-            onDismiss = { pendingTool = null },
-        )
+        if (tool == FileTool.SPLIT) {
+            InputDialog(
+                title = stringResource(tool.label),
+                label = stringResource(R.string.ftool_split_hint),
+                initial = "10",
+                confirmText = stringResource(R.string.btn_ok),
+                onConfirm = { typed ->
+                    pendingTool = null
+                    vm.splitFile(item.path, typed.toIntOrNull()?.coerceIn(1, 4096) ?: 10)
+                },
+                onDismiss = { pendingTool = null },
+            )
+        } else {
+            // Kata sandi umum yang tersimpan bisa dipilih langsung di dialog ini
+            PasswordDialog(
+                title = stringResource(tool.label),
+                onConfirm = { typed ->
+                    pendingTool = null
+                    if (tool == FileTool.ENCRYPT) vm.encryptFile(item.path, typed) else vm.decryptFile(item.path, typed)
+                },
+                onDismiss = { pendingTool = null },
+            )
+        }
     }
 
     if (sortOpen) {
@@ -888,12 +943,13 @@ fun MainScreen(
                 onUnpack = { vm.unpackApk() },
                 onRepack = { vm.repackApk() },
                 onSign = { vm.signApk() },
-                // Lewat root jika pengaturannya menyala dan root aktif, kalau tidak lewat pemasang Android
+                // Pengaturan "Verifikasi pemasangan APK" dan "Konfirmasi ganda": periksa dulu, tanyakan jika perlu
                 onInstall = {
-                    if (vm.installsWithRoot()) {
-                        vm.installApkRoot()
-                    } else {
-                        vm.installTarget()?.let { installWithSystem(context, it) }
+                    val verify = listPrefs.getBoolean(AppPrefs.KEY_VERIFY_INSTALL, true)
+                    val confirm = listPrefs.getBoolean(AppPrefs.KEY_INSTALL_CONFIRM, false)
+                    scope.launch {
+                        val warnings = if (verify) withContext(Dispatchers.IO) { vm.installWarnings() } else emptyList()
+                        if (warnings.isEmpty() && !confirm) doInstall() else installAsk = warnings
                     }
                 },
                 onBrowse = {
@@ -1339,6 +1395,7 @@ private fun ItemMenu(
     item: FileItem,
     multi: Boolean,
     inArchive: Boolean,
+    order: List<String>,
     towardRight: Boolean,
     dual: Boolean,
     onDismiss: () -> Unit,
@@ -1376,29 +1433,33 @@ private fun ItemMenu(
         MenuEntry(stringResource(R.string.btn_delete), Icons.Filled.Delete, Danger, onDelete),
         MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
         MenuEntry(stringResource(R.string.menu_compress), Icons.Filled.Archive, Ink, onCompress),
-    ) else listOfNotNull(
-        MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
-        MenuEntry(moveLabel, Icons.Filled.ContentCut, Ink, onMoveOther),
-        MenuEntry(stringResource(R.string.btn_rename), Icons.Filled.Edit, Ink, onRename),
-        MenuEntry(stringResource(R.string.btn_delete), Icons.Filled.Delete, Danger, onDelete),
-        MenuEntry(stringResource(R.string.menu_compress), Icons.Filled.Archive, Ink, onCompress),
-        MenuEntry(stringResource(R.string.menu_attributes), Icons.Filled.Info, Ink, onAttributes),
-        if (isFile) MenuEntry(stringResource(R.string.menu_send_device), Icons.Filled.SendToMobile, Ink, onSend) else null,
-        if (isFile) MenuEntry(stringResource(R.string.menu_share), Icons.Filled.Share, Ink, onShare) else null,
-        if (isFile) MenuEntry(stringResource(R.string.menu_open_with), Icons.Filled.OpenInNew, Ink, onOpenWith) else null,
-        if (isFile) MenuEntry(stringResource(R.string.menu_edit_hex), Icons.Filled.Code, Ink, onEditHex) else null,
-        MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
-        if (isFile) MenuEntry(stringResource(R.string.menu_edit_text), Icons.Filled.Description, Ink, onEditText) else null,
-        MenuEntry(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, Ink, onBookmark),
-        // Untuk ZIP, pilihan terakhir adalah mengekstrak, seperti NP Manager
-        if (isZip) {
-            MenuEntry(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, Ink, onExtract)
-        } else if (isFile) {
-            MenuEntry(stringResource(R.string.menu_run_script), Icons.Filled.Terminal, Ink, onRunScript)
-        } else {
-            null
-        },
-    )
+    ) else {
+        // Setiap pilihan punya kunci, supaya urutannya bisa diatur di Pengaturan ("Urutkan menu berkas")
+        val all: Map<String, MenuEntry?> = mapOf(
+            "copy" to MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
+            "move" to MenuEntry(moveLabel, Icons.Filled.ContentCut, Ink, onMoveOther),
+            "rename" to MenuEntry(stringResource(R.string.btn_rename), Icons.Filled.Edit, Ink, onRename),
+            "delete" to MenuEntry(stringResource(R.string.btn_delete), Icons.Filled.Delete, Danger, onDelete),
+            "compress" to MenuEntry(stringResource(R.string.menu_compress), Icons.Filled.Archive, Ink, onCompress),
+            "attributes" to MenuEntry(stringResource(R.string.menu_attributes), Icons.Filled.Info, Ink, onAttributes),
+            "send" to if (isFile) MenuEntry(stringResource(R.string.menu_send_device), Icons.Filled.SendToMobile, Ink, onSend) else null,
+            "share" to if (isFile) MenuEntry(stringResource(R.string.menu_share), Icons.Filled.Share, Ink, onShare) else null,
+            "openwith" to if (isFile) MenuEntry(stringResource(R.string.menu_open_with), Icons.Filled.OpenInNew, Ink, onOpenWith) else null,
+            "hex" to if (isFile) MenuEntry(stringResource(R.string.menu_edit_hex), Icons.Filled.Code, Ink, onEditHex) else null,
+            "tools" to MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
+            "edittext" to if (isFile) MenuEntry(stringResource(R.string.menu_edit_text), Icons.Filled.Description, Ink, onEditText) else null,
+            "bookmark" to MenuEntry(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, Ink, onBookmark),
+            // Untuk ZIP pilihannya mengekstrak, untuk berkas lain menjalankan skrip
+            "extra" to if (isZip) {
+                MenuEntry(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, Ink, onExtract)
+            } else if (isFile) {
+                MenuEntry(stringResource(R.string.menu_run_script), Icons.Filled.Terminal, Ink, onRunScript)
+            } else {
+                null
+            },
+        )
+        order.mapNotNull { all[it] }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1620,6 +1681,8 @@ private fun DrawerSheet(
         DrawerTool(R.string.tool_http, Icons.Filled.Language, { onTool(ToolKind.HTTP) }),
         DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, { onTool(ToolKind.LAN) }),
         DrawerTool(R.string.tool_recycle, Icons.Filled.Delete, onTrash),
+        DrawerTool(R.string.tool_keys, Icons.Filled.VpnKey, { onTool(ToolKind.KEYS) }),
+        DrawerTool(R.string.tool_passwords, Icons.Filled.Lock, { onTool(ToolKind.PASSWORDS) }),
         DrawerTool(R.string.tool_java2smali, Icons.Filled.Coffee, null),
         DrawerTool(R.string.tool_smali_query, Icons.Filled.Description, { onTool(ToolKind.SMALI) }),
         DrawerTool(R.string.tool_network, Icons.Filled.Public, { onTool(ToolKind.NETWORK) }),

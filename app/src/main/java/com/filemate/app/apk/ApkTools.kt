@@ -1,6 +1,7 @@
 package com.filemate.app.apk
 
 import com.android.apksig.ApkSigner
+import com.android.apksig.ApkVerifier
 import java.io.File
 import java.util.Collections
 import java.util.zip.CRC32
@@ -98,6 +99,26 @@ object ApkTools {
             .setV3SigningEnabled(true)
             .build()
             .sign()
+    }
+
+    /** Sertifikat penanda tangan sebuah APK (isi mentahnya). Kosong jika APK tidak bertanda tangan atau rusak. */
+    fun signerCertificates(apk: File): List<ByteArray> = try {
+        ApkVerifier.Builder(apk).build().verify().signerCertificates.map { it.encoded }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    /** Skema tanda tangan sebuah APK, misalnya "V1 + V2". Kosong jika tidak bisa diperiksa. */
+    fun signatureSchemes(apk: File): String = try {
+        val result = ApkVerifier.Builder(apk).build().verify()
+        listOfNotNull(
+            if (result.isVerifiedUsingV1Scheme) "V1" else null,
+            if (result.isVerifiedUsingV2Scheme) "V2" else null,
+            if (result.isVerifiedUsingV3Scheme) "V3" else null,
+            if (result.isVerifiedUsingV4Scheme) "V4" else null,
+        ).joinToString(" + ")
+    } catch (e: Exception) {
+        ""
     }
 
     /** Tanda tangan lama dan file manifest buatan penanda tangan tidak ikut dikemas ulang. */

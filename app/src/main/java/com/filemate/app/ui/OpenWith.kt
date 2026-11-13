@@ -136,6 +136,17 @@ object OpenDefaults {
             }
             .sortedBy { it.first }
 
+    /** Semua cara buka dan namanya, dalam urutan bawaan. Dipakai dialog pengatur urutan di Pengaturan. */
+    val ITEMS: List<Pair<String, Int>> get() = CHOICES.map { it.mode.name to it.label }
+
+    /** Nama-nama cara buka dalam urutan yang disimpan user. */
+    fun order(context: Context): List<String> =
+        MenuOrder.merge(AppPrefs.of(context).getString(AppPrefs.KEY_OPEN_ORDER, "").orEmpty(), CHOICES.map { it.mode.name })
+
+    fun saveOrder(context: Context, order: List<String>) {
+        AppPrefs.of(context).edit().putString(AppPrefs.KEY_OPEN_ORDER, order.joinToString(",")).apply()
+    }
+
     /** Nama cara buka untuk ditampilkan. */
     fun labelOf(mode: OpenMode): Int = CHOICES.firstOrNull { it.mode == mode }?.label ?: R.string.open_title
 }
@@ -163,7 +174,9 @@ fun OpenWithDialog(
     var manageOpen by remember { mutableStateOf(false) }
     // Naik setiap ada cara buka bawaan yang dihapus, supaya daftarnya dibaca ulang
     var defaultsVersion by remember { mutableStateOf(0) }
-    val labeled = CHOICES.map { it to stringResource(it.label) }
+    // Urutan ikon mengikuti pengaturan "Urutkan cara buka"
+    val ordered = remember { OpenDefaults.order(context).mapNotNull { name -> CHOICES.firstOrNull { it.mode.name == name } } }
+    val labeled = ordered.map { it to stringResource(it.label) }
     val shown = labeled.filter { query.isBlank() || it.second.contains(query.trim(), ignoreCase = true) }
 
     Dialog(onDismissRequest = onDismiss) {

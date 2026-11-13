@@ -19,6 +19,10 @@ object FileRepository {
     @Volatile
     var FILEMATE_DIR: String = DEFAULT_FILEMATE_DIR
 
+    /** Waktu ubah berkas dipertahankan saat disalin. Diatur di Pengaturan. */
+    @Volatile
+    var keepTime: Boolean = true
+
     // Baris keluaran `ls -la`, contoh: -rw-rw---- 1 root sdcard_rw 1234 2026-11-12 10:00 nama.txt
     // Kolom: izin, jumlah link, pemilik, grup, ukuran, tanggal, nama
     private val lsLine = Regex(
@@ -169,7 +173,11 @@ object FileRepository {
         val target = uniqueTarget(destDir, nameOf(src), root)
         if (root) {
             val verb = if (move) "mv" else "cp -r"
-            val ok = RootShell.run("$verb ${RootShell.quote(src)} ${RootShell.quote(target)}").exitCode == 0
+            val from = RootShell.quote(src)
+            val to = RootShell.quote(target)
+            // Pengaturan "Pertahankan waktu file": waktu ubah salinan disamakan dengan aslinya
+            val stamp = if (!move && keepTime) " && touch -r $from $to" else ""
+            val ok = RootShell.run("$verb $from $to$stamp").exitCode == 0
             return if (ok) target else null
         }
         val source = File(src)
@@ -177,9 +185,22 @@ object FileRepository {
         if (move && source.renameTo(dest)) return target
         return try {
             source.copyRecursively(dest, overwrite = false)
+            if (keepTime) copyTimes(source, dest)
             if (move && !source.deleteRecursively()) null else target
         } catch (e: Exception) {
             null
+        }
+    }
+
+    /** Menyamakan waktu ubah [dest] (dan semua isinya) dengan [source]. Kegagalan diabaikan. */
+    private fun copyTimes(source: File, dest: File) {
+        try {
+            if (source.isDirectory) {
+                source.listFiles()?.forEach { child -> copyTimes(child, File(dest, child.name)) }
+            }
+            dest.setLastModified(source.lastModified())
+        } catch (e: Exception) {
+            // Waktu ubah hanya pelengkap, salinannya tetap dianggap berhasil
         }
     }
 

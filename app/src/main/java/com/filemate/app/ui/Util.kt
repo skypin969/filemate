@@ -29,10 +29,27 @@ fun formatSize(bytes: Long): String {
     }
 }
 
-/** Tanggal dalam format yy-MM-dd HH:mm, dipakai di daftar berkas. */
+/** Pilihan format tanggal untuk daftar berkas. Diatur di Pengaturan. */
+object DateFormats {
+    val PATTERNS = listOf(
+        "yy-MM-dd HH:mm",
+        "yyyy-MM-dd HH:mm",
+        "yyyy-MM-dd HH:mm:ss",
+        "dd/MM/yyyy HH:mm",
+        "dd MMM yyyy HH:mm",
+    )
+
+    /** Nomor pola yang sedang dipakai. */
+    @Volatile
+    var selected: Int = 0
+
+    val pattern: String get() = PATTERNS.getOrElse(selected) { PATTERNS[0] }
+}
+
+/** Tanggal untuk daftar berkas, dalam format yang dipilih di Pengaturan (bawaannya yy-MM-dd HH:mm). */
 fun formatDate(millis: Long): String {
     if (millis <= 0L) return "-"
-    return SimpleDateFormat("yy-MM-dd HH:mm", Locale.US).format(Date(millis))
+    return SimpleDateFormat(DateFormats.pattern, Locale.getDefault()).format(Date(millis))
 }
 
 /** Tanggal lengkap dengan detik, dipakai di dialog atribut. */

@@ -71,6 +71,22 @@ object Trash {
         return ok
     }
 
+    /**
+     * Menghapus selamanya isi Recycle Bin yang sudah lebih dari [days] hari. Waktu dibuangnya
+     * terbaca dari awalan nama berkas simpanan. Mengembalikan jumlah yang dihapus.
+     */
+    @Synchronized
+    fun purgeOlderThan(days: Int): Int {
+        if (days <= 0) return 0
+        val limit = System.currentTimeMillis() - days * 24L * 60 * 60 * 1000
+        var removed = 0
+        for (entry in list()) {
+            val trashedAt = entry.stored.name.substringBefore('_').toLongOrNull() ?: continue
+            if (trashedAt < limit && deleteForever(entry)) removed++
+        }
+        return removed
+    }
+
     private fun forget(entry: TrashEntry) {
         if (!index.isFile) return
         val kept = index.readLines().filterNot { it.startsWith(entry.stored.name + "\t") }

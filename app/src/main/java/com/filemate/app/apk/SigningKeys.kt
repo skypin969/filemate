@@ -2,11 +2,15 @@ package com.filemate.app.apk
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import java.io.File
 import java.math.BigInteger
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Calendar
 import java.util.Date
 import javax.security.auth.x500.X500Principal
@@ -22,7 +26,27 @@ object SigningKeys {
 
     private const val ALIAS = "filemate_signing_key"
 
+    /** Berkas kunci pilihan user. Kosong berarti kunci bawaan Filemate yang dipakai. */
+    @Volatile
+    var customPath: String = ""
+
+    /** Kata sandi berkas kunci (hanya untuk berkas keystore seperti .p12). */
+    @Volatile
+    var customPassword: String = ""
+
+    /** Akhiran berkas kunci yang bisa dipakai. */
+    val KEY_EXTENSIONS = setOf("pk8", "p12", "pfx", "bks")
+
+    /** Kunci yang dipakai untuk menandatangani: kunci pilihan user jika bisa dibaca, kalau tidak kunci bawaan. */
     fun load(): SigningKey {
+        if (customPath.isNotEmpty()) {
+            loadFile(File(customPath), customPassword)?.let { return it }
+        }
+        return builtIn()
+    }
+
+    /** Kunci bawaan Filemate, disimpan di Android Keystore. Dibuat saat pertama kali dipakai. */
+    fun builtIn(): SigningKey {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         if (!keyStore.containsAlias(ALIAS)) {
             create()
@@ -30,6 +54,44 @@ object SigningKeys {
         val key = keyStore.getKey(ALIAS, null) as PrivateKey
         val cert = keyStore.getCertificate(ALIAS) as X509Certificate
         return SigningKey(key, cert)
+    }
+
+    /**
+     * Membaca kunci dari berkas. Yang didukung: pasangan nama.pk8 dan nama.x509.pem (atau nama.pem),
+     * serta keystore .p12, .pfx, dan .bks dengan kata sandi. Null jika tidak bisa dibaca.
+     */
+    fun loadFile(file: File, password: String): SigningKey? = try {
+        when (file.extension.lowercase()) {
+            "pk8" -> {
+                val base = file.path.removeSuffix("." + file.extension)
+                val certFile = listOf("$base.x509.pem", "$base.pem", "$base.crt", "$base.cer")
+                    .map { File(it) }
+                    .first { it.isFile }
+                val spec = PKCS8EncodedKeySpec(file.readBytes())
+                // Jenis kunci dicoba satu per satu, karena berkas pk8 tidak menyebut jenisnya di nama
+                val key = listOf("RSA", "EC", "DSA").firstNotNullOf { type ->
+                    try {
+                        KeyFactory.getInstance(type).generatePrivate(spec)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                val cert = certFile.inputStream().use {
+                    CertificateFactory.getInstance("X.509").generateCertificate(it) as X509Certificate
+                }
+                SigningKey(key, cert)
+            }
+            else -> {
+                val type = if (file.extension.equals("bks", ignoreCase = true)) "BKS" else "PKCS12"
+                val chars = password.toCharArray()
+                val store = KeyStore.getInstance(type)
+                file.inputStream().use { store.load(it, chars) }
+                val alias = store.aliases().toList().first { store.isKeyEntry(it) }
+                SigningKey(store.getKey(alias, chars) as PrivateKey, store.getCertificate(alias) as X509Certificate)
+            }
+        }
+    } catch (e: Exception) {
+        null
     }
 
     private fun create() {

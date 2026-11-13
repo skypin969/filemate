@@ -5,6 +5,7 @@ import com.filemate.app.data.Volumes
 import androidx.core.content.ContextCompat
 import android.hardware.usb.UsbManager
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.Context
 import android.content.BroadcastReceiver
@@ -142,7 +143,10 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(
         UiState(
             bookmarks = loadBookmarks(),
-            panels = startFolder().let { listOf(PanelState(it), PanelState(it)) },
+            panels = listOf(
+                PanelState(startFolder(AppPrefs.KEY_HOME_LEFT)),
+                PanelState(startFolder(AppPrefs.KEY_HOME_RIGHT)),
+            ),
         ),
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -153,6 +157,11 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         // pengelola root (Magisk, KernelSU), mode root langsung aktif tanpa tombol.
         setRootMode(true, quiet = true)
         watchVolumes(app)
+        // Pengaturan "Membersihkan Recycle Bin secara otomatis"
+        val trashDays = prefs.getInt(AppPrefs.KEY_TRASH_DAYS, 0)
+        if (trashDays > 0) {
+            viewModelScope.launch(Dispatchers.IO) { Trash.purgeOlderThan(trashDays) }
+        }
         // Sakelar "Mulai layanan secara otomatis saat aplikasi dibuka" di dialog APK MCP
         if (prefs.getBoolean(AppPrefs.KEY_MCP_AUTO, false)) {
             try {
@@ -251,11 +260,16 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     private fun isUserStorage(path: String): Boolean =
         path.startsWith(FileRepository.STORAGE_ROOT) || Volumes.isDirect(path)
 
-    /** Folder awal: folder beranda pilihan user jika masih bisa dibuka, kalau tidak penyimpanan internal. */
-    private fun startFolder(): String {
-        val home = prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()
-        val usable = home.startsWith(FileRepository.STORAGE_ROOT) && File(home).isDirectory
-        return if (usable) home else FileRepository.STORAGE_ROOT
+    /**
+     * Folder awal satu panel: jalur startup panel itu ([sideKey]) jika diisi dan masih bisa dibuka,
+     * lalu beranda pilihan user, dan terakhir penyimpanan internal.
+     */
+    private fun startFolder(sideKey: String): String {
+        for (key in listOf(sideKey, AppPrefs.KEY_HOME)) {
+            val path = prefs.getString(key, "").orEmpty()
+            if (path.startsWith(FileRepository.STORAGE_ROOT) && File(path).isDirectory) return path
+        }
+        return FileRepository.STORAGE_ROOT
     }
 
     /** Menu titik tiga "Atur sebagai beranda": folder ini dibuka setiap aplikasi mulai. */
@@ -913,6 +927,55 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             }
             _state.update { it.copy(message = message) }
             reloadAll()
+        }
+    }
+
+    // ---------- Kunci tanda tangan ----------
+
+    /** "Importir tanda tangan": menyalin berkas kunci (dan sertifikat pasangannya) ke folder kunci Filemate. */
+    fun importKey(path: String) = runTool {
+        val source = File(path)
+        val dir = File(FileRepository.FILEMATE_DIR, "keys")
+        dir.mkdirs()
+        var copied = 0
+        val base = source.path.removeSuffix("." + source.extension)
+        // Berkas pk8 butuh sertifikat pasangannya, jadi keduanya ikut disalin jika ada
+        val family = listOf(source) + listOf("pk8", "x509.pem", "pem", "crt", "cer").map { File("$base.$it") }
+        for (file in family.distinctBy { it.path }) {
+            if (file.isFile) {
+                file.copyTo(File(dir, file.name), overwrite = true)
+                copied++
+            }
+        }
+        if (copied > 0) text(R.string.msg_key_imported, dir.path) else text(R.string.msg_failed)
+    }
+
+    /**
+     * Memeriksa APK yang akan dipasang terhadap aplikasi yang sudah terpasang: versi lebih lama
+     * atau tanda tangan berbeda akan membuat pemasangan gagal. Mengembalikan daftar peringatan.
+     */
+    fun installWarnings(): List<String> {
+        val target = installTarget() ?: return emptyList()
+        val pm = getApplication<Application>().packageManager
+        return try {
+            val archive = pm.getPackageArchiveInfo(target, 0) ?: return emptyList()
+            val installed = try {
+                pm.getPackageInfo(archive.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            } catch (e: PackageManager.NameNotFoundException) {
+                return emptyList()
+            }
+            val warnings = ArrayList<String>()
+            if (archive.longVersionCode < installed.longVersionCode) {
+                warnings.add(text(R.string.install_warn_downgrade, archive.longVersionCode, installed.longVersionCode))
+            }
+            val current = installed.signingInfo?.apkContentsSigners.orEmpty().map { it.toByteArray().toList() }.toSet()
+            val incoming = ApkTools.signerCertificates(File(target)).map { it.toList() }.toSet()
+            if (current.isNotEmpty() && incoming.isNotEmpty() && current.intersect(incoming).isEmpty()) {
+                warnings.add(text(R.string.install_warn_signature))
+            }
+            warnings
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 

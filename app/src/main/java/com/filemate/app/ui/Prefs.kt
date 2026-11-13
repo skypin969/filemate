@@ -2,6 +2,7 @@ package com.filemate.app.ui
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.filemate.app.apk.SigningKeys
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
 
@@ -65,6 +66,38 @@ object AppPrefs {
     const val KEY_EDITOR_FONT = "editor_font"
     const val KEY_EDITOR_NUMBERS = "editor_numbers"
 
+    /** Folder awal panel kiri dan kanan. Kosong berarti mengikuti beranda. */
+    const val KEY_HOME_LEFT = "home_left"
+    const val KEY_HOME_RIGHT = "home_right"
+
+    /** Nomor format tanggal di daftar berkas (lihat [DateFormats]). */
+    const val KEY_DATE_FORMAT = "date_format"
+
+    /** Menyembunyikan izin (rwx) di daftar berkas folder sistem. */
+    const val KEY_HIDE_PERMS = "hide_perms"
+
+    /** Waktu ubah berkas dipertahankan saat disalin. */
+    const val KEY_KEEP_TIME = "keep_time"
+
+    /** Gambar mini juga dimuat di flashdisk dan kartu SD. */
+    const val KEY_THUMBS_EXTERNAL = "thumbs_external"
+
+    /** Isi Recycle Bin yang lebih tua dari sekian hari dihapus otomatis. 0 berarti tidak pernah. */
+    const val KEY_TRASH_DAYS = "trash_days"
+
+    /** Memeriksa versi dan tanda tangan sebelum memasang APK, dan konfirmasi sebelum pasang lewat root. */
+    const val KEY_VERIFY_INSTALL = "verify_install"
+    const val KEY_INSTALL_CONFIRM = "install_confirm"
+
+    /** Urutan pilihan menu tekan lama dan urutan cara buka di dialog "Buka dengan". */
+    const val KEY_MENU_ORDER = "menu_order"
+    const val KEY_OPEN_ORDER = "open_order"
+
+    /** Berkas kunci tanda tangan pilihan user dan kata sandinya, serta daftar kata sandi umum. */
+    const val KEY_SIGN_KEY = "sign_key"
+    const val KEY_SIGN_PASS = "sign_pass"
+    const val KEY_PASSWORDS = "common_passwords"
+
     /** Recycle Bin: fitur aktif, dicentang secara bawaan, dan peringatan merah saat hapus permanen. */
     const val KEY_TRASH_ON = "trash_enabled"
     const val KEY_TRASH_DEFAULT = "trash_default"
@@ -90,6 +123,10 @@ object AppPrefs {
         RootShell.suCommand = prefs.getString(KEY_SU, "su").orEmpty().ifBlank { "su" }
         FileRepository.FILEMATE_DIR =
             prefs.getString(KEY_WORK_DIR, "").orEmpty().ifBlank { FileRepository.DEFAULT_FILEMATE_DIR }
+        FileRepository.keepTime = prefs.getBoolean(KEY_KEEP_TIME, true)
+        DateFormats.selected = prefs.getInt(KEY_DATE_FORMAT, 0)
+        SigningKeys.customPath = prefs.getString(KEY_SIGN_KEY, "").orEmpty()
+        SigningKeys.customPassword = prefs.getString(KEY_SIGN_PASS, "").orEmpty()
     }
 
     fun of(context: Context): SharedPreferences =

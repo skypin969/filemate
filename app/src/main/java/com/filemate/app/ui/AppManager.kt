@@ -1,6 +1,11 @@
 package com.filemate.app.ui
 
 import android.content.Context
+import com.filemate.app.apk.ApkTools
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
@@ -138,6 +143,20 @@ fun AppManagerScreen(onBack: () -> Unit) {
     var filter by remember { mutableStateOf(AppFilter.ALL) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    // Aplikasi yang rinciannya sedang ditampilkan
+    var detail by remember { mutableStateOf<AppRow?>(null) }
+
+    fun extract(app: AppRow) {
+        scope.launch {
+            val path = withContext(Dispatchers.IO) { extractApk(app) }
+            val message = if (path != null) {
+                context.getString(R.string.apps_extracted, path)
+            } else {
+                context.getString(R.string.apps_extract_failed)
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     BackHandler {
         if (searching) {
@@ -270,32 +289,105 @@ fun AppManagerScreen(onBack: () -> Unit) {
             items(shown, key = { it.packageName }) { app ->
                 AppCard(
                     app = app,
-                    onOpen = {
-                        // Membuka halaman info aplikasi di pengaturan Android
-                        try {
-                            context.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    .setData(Uri.parse("package:${app.packageName}")),
-                            )
-                        } catch (e: Exception) {
-                            Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onExtract = {
-                        scope.launch {
-                            val path = withContext(Dispatchers.IO) { extractApk(app) }
-                            val message = if (path != null) {
-                                context.getString(R.string.apps_extracted, path)
-                            } else {
-                                context.getString(R.string.apps_extract_failed)
-                            }
-                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                        }
-                    },
+                    // Mengetuk kartu menampilkan rincian aplikasi, seperti MT Manager
+                    onOpen = { detail = app },
+                    onExtract = { extract(app) },
                 )
             }
         }
     }
+
+    detail?.let { app ->
+        AppDetailDialog(
+            app = app,
+            onMore = {
+                detail = null
+                // Membuka halaman info aplikasi di pengaturan Android
+                try {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.parse("package:${app.packageName}")),
+                    )
+                } catch (e: Exception) {
+                    Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+                }
+            },
+            onExtract = {
+                detail = null
+                extract(app)
+            },
+            onDismiss = { detail = null },
+        )
+    }
+}
+
+/** Rincian satu aplikasi untuk dialog: pasangan label dan isinya. */
+private fun loadAppDetails(context: Context, app: AppRow): List<Pair<Int, String>> {
+    val pm = context.packageManager
+    val rows = ArrayList<Pair<Int, String>>()
+    rows.add(R.string.app_detail_package to app.packageName)
+    try {
+        val info = pm.getPackageInfo(app.packageName, 0)
+        val data = info.applicationInfo
+        rows.add(R.string.app_detail_version_code to info.longVersionCode.toString())
+        rows.add(R.string.attr_size to formatSize(app.size + app.splitSize))
+        val schemes = ApkTools.signatureSchemes(File(app.apkPath))
+        if (schemes.isNotEmpty()) rows.add(R.string.app_detail_signature to schemes)
+        if (data != null) {
+            rows.add(R.string.app_detail_target_sdk to "API ${data.targetSdkVersion}")
+            rows.add(R.string.app_detail_min_sdk to "API ${data.minSdkVersion}")
+            rows.add(R.string.app_detail_data_dir to data.dataDir.orEmpty())
+            rows.add(R.string.app_detail_data_dir2 to FileRepository.STORAGE_ROOT + "/Android/data/" + app.packageName)
+            rows.add(R.string.app_detail_apk_path to data.sourceDir.orEmpty())
+        }
+        rows.add(R.string.app_detail_installed to formatDateFull(info.firstInstallTime))
+        rows.add(R.string.app_detail_updated to formatDateFull(info.lastUpdateTime))
+        if (data != null) rows.add(R.string.app_detail_uid to data.uid.toString())
+    } catch (e: Exception) {
+        // Aplikasi mungkin baru saja dicopot. Yang sudah terkumpul tetap ditampilkan.
+    }
+    return rows
+}
+
+/** Dialog rincian aplikasi seperti MT Manager: ikon dan nama di atas, lalu daftar keterangan. */
+@Composable
+private fun AppDetailDialog(app: AppRow, onMore: () -> Unit, onExtract: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val rows by produceState(initialValue = emptyList<Pair<Int, String>>(), app.packageName) {
+        value = withContext(Dispatchers.IO) { loadAppDetails(context, app) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = {
+            Column {
+                Text(app.label, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(app.version, color = Muted, fontSize = 12.sp)
+            }
+        },
+        text = {
+            SelectionContainer {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    rows.forEach { (label, value) ->
+                        Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(stringResource(label), color = Muted, fontSize = 13.sp, modifier = Modifier.width(104.dp))
+                            Text(value, color = Ink, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onExtract) {
+                Text(stringResource(R.string.apps_extract), color = Accent, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onMore) {
+                Text(stringResource(R.string.app_detail_more), color = Accent, fontWeight = FontWeight.SemiBold)
+            }
+        },
+    )
 }
 
 @Composable
