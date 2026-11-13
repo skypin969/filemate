@@ -97,6 +97,7 @@ object FileRepository {
             isLink = isLink,
             size = match.groupValues[2].toLongOrNull() ?: 0L,
             modified = parseLsDate(match.groupValues[3]),
+            perm = perm.take(10),
         )
     }
 

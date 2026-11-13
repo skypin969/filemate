@@ -47,7 +47,7 @@ fun FilemateApp() {
             onBack = { preview = null },
             onEdit = {
                 preview = null
-                editor = EditorTarget(shown.path, hex = false, root = false)
+                editor = EditorTarget(shown.path, hex = false, root = false).also { EditorSession.open(it) }
             },
         )
         return
@@ -87,7 +87,11 @@ fun FilemateApp() {
 
         Screen.MAIN -> MainScreen(
             onOpenSettings = { screen = Screen.SETTINGS },
-            onOpenEditor = { editor = it },
+            onOpenEditor = {
+                // Editor teks menyimpan daftar berkas yang terbuka, editor hex tidak
+                if (!it.hex) EditorSession.open(it)
+                editor = it
+            },
             onOpenTerminal = { terminal = it },
             onOpenApps = { screen = Screen.APPS },
             onOpenTrash = { screen = Screen.TRASH },

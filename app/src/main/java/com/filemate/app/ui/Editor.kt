@@ -32,6 +32,33 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditOff
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SaveAs
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Spellcheck
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.WrapText
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -84,7 +111,7 @@ private const val HEX_CHARS = "0123456789abcdefABCDEF"
  * Berkas kerja tempat perubahan disimpan. Jika berkas asli tidak bisa diubah langsung,
  * dibuat salinan di cache lewat root, dan salinan itu dikembalikan ke aslinya saat disimpan.
  */
-private class Workfile(val file: File, val isCopy: Boolean) {
+internal class Workfile(val file: File, val isCopy: Boolean) {
     fun discard() {
         if (isCopy) file.delete()
     }
@@ -98,13 +125,22 @@ private class Opened(
     val size: Long = 0L,
 )
 
-/** Layar editor: teks biasa atau hex, tergantung pilihan di menu. */
+/**
+ * Layar editor: teks biasa atau hex, tergantung pilihan di menu. Editor teks menampilkan berkas
+ * yang sedang aktif di [EditorSession], jadi bisa berpindah di antara beberapa berkas yang terbuka.
+ */
 @Composable
 fun EditorScreen(target: EditorTarget, onBack: () -> Unit) {
     if (target.hex) {
         HexEditor(target, onBack)
+        return
+    }
+    val doc = EditorSession.current
+    if (doc == null) {
+        // Semua berkas sudah ditutup
+        LaunchedEffect(Unit) { onBack() }
     } else {
-        TextEditor(target, onBack)
+        key(doc) { TextEditor(doc, onExit = onBack) }
     }
 }
 
@@ -179,77 +215,295 @@ private fun readPage(file: File, page: Int): ByteArray {
 private val SYMBOLS = listOf("Tab", "<", ">", "=", "\"", ":", "@", "+", "-", "/", "(", ")", "{", "}", "[", "]", ";", ".", ",", "_", "#", "$", "&", "|", "!", "?", "*", "'")
 private const val MAX_UNDO = 100
 
+/** Paling banyak hasil pencarian yang dihitung, supaya berkas besar tidak membuat editor tersendat. */
+private const val MAX_MATCHES = 5000
+
+/** Di atas jumlah baris ini, nomor baris tidak lagi disejajarkan dengan baris yang terlipat. */
+private const val MAX_GUTTER_LINES = 20_000
+
+private val WORD = Regex("[A-Za-z_][A-Za-z0-9_]{2,}")
+
+/** Pilihan bahasa di dialog "Sintaks": nama yang tampil dan akhiran berkas yang mewakilinya. */
+private val SYNTAX_CHOICES = listOf(
+    "XML / HTML" to "xml",
+    "JSON" to "json",
+    "Smali" to "smali",
+    "Java / Kotlin / JavaScript / CSS / C" to "java",
+    "Shell / Properties / YAML / Python" to "sh",
+)
+
+/**
+ * Satu berkas yang sedang terbuka di editor teks. Isinya tetap tersimpan di sini selama editor
+ * diperkecil atau berpindah ke berkas lain, jadi perubahan yang belum disimpan tidak hilang.
+ */
+class EditorDoc(val target: EditorTarget) {
+    internal var work by mutableStateOf<Workfile?>(null)
+    var value by mutableStateOf(TextFieldValue(""))
+    var saved by mutableStateOf("")
+    var error by mutableStateOf<String?>(null)
+    var loading by mutableStateOf(true)
+    internal var loaded = false
+    val undoStack = mutableStateListOf<String>()
+    val redoStack = mutableStateListOf<String>()
+
+    /** True jika ada perubahan yang belum disimpan. */
+    val dirty: Boolean get() = work != null && value.text != saved
+}
+
+/** Daftar berkas yang terbuka di editor teks, seperti daftar di sisi kiri editor MT Manager. */
+object EditorSession {
+    val docs = mutableStateListOf<EditorDoc>()
+    var current by mutableStateOf<EditorDoc?>(null)
+
+    /** Membuka [target], atau berpindah ke sana jika sudah terbuka. */
+    fun open(target: EditorTarget): EditorDoc {
+        val doc = docs.firstOrNull { it.target.path == target.path } ?: EditorDoc(target).also { docs.add(it) }
+        current = doc
+        return doc
+    }
+
+    fun close(doc: EditorDoc) {
+        doc.work?.discard()
+        docs.remove(doc)
+        if (current === doc) current = docs.lastOrNull()
+    }
+}
+
+private suspend fun loadDoc(context: Context, doc: EditorDoc) {
+    doc.loading = true
+    val opened = withContext(Dispatchers.IO) { openForText(context, doc.target) }
+    doc.work = opened.work
+    doc.value = TextFieldValue(opened.text)
+    doc.saved = opened.text
+    doc.error = opened.error
+    doc.undoStack.clear()
+    doc.redoStack.clear()
+    doc.loading = false
+}
+
+/** Mencari semua kemunculan [query] di [text]. Pola regex yang salah tulis menghasilkan daftar kosong. */
+private fun findMatches(text: String, query: String, matchCase: Boolean, wholeWord: Boolean, useRegex: Boolean): List<IntRange> {
+    if (query.isEmpty()) return emptyList()
+    return try {
+        val body = if (useRegex) query else Regex.escape(query)
+        val pattern = if (wholeWord) "\\b(?:$body)\\b" else body
+        val options = if (matchCase) setOf(RegexOption.MULTILINE) else setOf(RegexOption.MULTILINE, RegexOption.IGNORE_CASE)
+        Regex(pattern, options).findAll(text)
+            .filter { !it.range.isEmpty() }
+            .take(MAX_MATCHES)
+            .map { it.range }
+            .toList()
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+/**
+ * Teks nomor baris. Jika [layout] diberikan (mode bungkus kata), baris yang terlipat diberi baris
+ * kosong di bawah nomornya supaya nomor tetap sejajar dengan awal barisnya.
+ */
+private fun gutterText(text: String, lineCount: Int, layout: TextLayoutResult?): String {
+    if (layout == null || lineCount > MAX_GUTTER_LINES || layout.layoutInput.text.length != text.length) {
+        return (1..lineCount).joinToString("\n")
+    }
+    val out = StringBuilder()
+    var number = 1
+    var start = 0
+    while (true) {
+        val newline = text.indexOf('\n', start)
+        val end = if (newline < 0) text.length else newline
+        val folds = layout.getLineForOffset(end) - layout.getLineForOffset(start)
+        out.append(number)
+        repeat(folds) { out.append('\n') }
+        if (newline < 0) break
+        out.append('\n')
+        start = newline + 1
+        number++
+    }
+    return out.toString()
+}
+
 @Composable
-private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
+private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var work by remember { mutableStateOf<Workfile?>(null) }
-    var value by remember { mutableStateOf(TextFieldValue("")) }
-    var saved by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var confirmExit by remember { mutableStateOf(false) }
-    // Isi sebelum setiap perubahan, untuk tombol urung dan ulang
-    val undoStack = remember { mutableStateListOf<String>() }
-    val redoStack = remember { mutableStateListOf<String>() }
+    val prefs = remember { AppPrefs.of(context) }
+    val target = doc.target
+    val vScroll = rememberScrollState()
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var confirmClose by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var fileMenuOpen by remember { mutableStateOf(false) }
+    var listOpen by remember { mutableStateOf(false) }
+    var gotoOpen by remember { mutableStateOf(false) }
+    var syntaxOpen by remember { mutableStateOf(false) }
+    var prefsOpen by remember { mutableStateOf(false) }
+    var saveAsOpen by remember { mutableStateOf(false) }
+    // Pilihan dari menu titik tiga. Sebagian diingat untuk berkas berikutnya.
+    var wrap by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_EDITOR_WRAP, true)) }
+    var readOnly by remember { mutableStateOf(false) }
+    var fluid by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_FLUID, false)) }
+    var complete by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_EDITOR_COMPLETE, false)) }
+    var fontSize by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_EDITOR_FONT, 13).coerceIn(9, 28)) }
+    var showNumbers by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_EDITOR_NUMBERS, true)) }
+    // Bahasa pewarnaan pilihan user. Null berarti mengikuti akhiran nama berkas.
+    var syntaxExt by remember { mutableStateOf<String?>(null) }
+    // Cari dan ganti
+    var searchOpen by remember { mutableStateOf(false) }
+    var replaceOpen by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var replacement by remember { mutableStateOf("") }
+    var matchCase by remember { mutableStateOf(false) }
+    var wholeWord by remember { mutableStateOf(false) }
+    var useRegex by remember { mutableStateOf(false) }
+    // Riwayat posisi kursor untuk "Posisi sebelumnya" dan "Posisi berikutnya"
+    val backJumps = remember { mutableStateListOf<Int>() }
+    val forwardJumps = remember { mutableStateListOf<Int>() }
 
+    val value = doc.value
     val text = value.text
-    val dirty = work != null && text != saved
+    val ready = doc.work != null && !doc.loading
+    val err = doc.error
 
     fun close() {
-        work?.discard()
-        onBack()
+        EditorSession.close(doc)
+        if (EditorSession.docs.isEmpty()) onExit()
     }
 
     fun requestClose() {
-        if (dirty) confirmExit = true else close()
+        if (doc.dirty) confirmClose = true else close()
     }
 
-    BackHandler { requestClose() }
+    BackHandler {
+        if (searchOpen) searchOpen = false else requestClose()
+    }
 
-    LaunchedEffect(target) {
-        val opened = withContext(Dispatchers.IO) { openForText(context, target) }
-        work = opened.work
-        value = TextFieldValue(opened.text)
-        saved = opened.text
-        error = opened.error
-        loading = false
+    LaunchedEffect(doc) {
+        if (!doc.loaded) {
+            doc.loaded = true
+            loadDoc(context, doc)
+        }
     }
 
     /** Mengganti isi editor dan mencatat isi lama supaya bisa diurungkan. */
     fun change(next: TextFieldValue) {
-        if (next.text != value.text) {
-            undoStack.add(value.text)
-            if (undoStack.size > MAX_UNDO) undoStack.removeAt(0)
-            redoStack.clear()
+        if (next.text != doc.value.text) {
+            doc.undoStack.add(doc.value.text)
+            if (doc.undoStack.size > MAX_UNDO) doc.undoStack.removeAt(0)
+            doc.redoStack.clear()
         }
-        value = next
+        doc.value = next
     }
 
     fun undo() {
-        val previous = undoStack.removeLastOrNull() ?: return
-        redoStack.add(value.text)
-        value = TextFieldValue(previous, TextRange(minOf(value.selection.start, previous.length)))
+        val previous = doc.undoStack.removeLastOrNull() ?: return
+        doc.redoStack.add(doc.value.text)
+        doc.value = TextFieldValue(previous, TextRange(minOf(doc.value.selection.start, previous.length)))
     }
 
     fun redo() {
-        val next = redoStack.removeLastOrNull() ?: return
-        undoStack.add(value.text)
-        value = TextFieldValue(next, TextRange(minOf(value.selection.start, next.length)))
+        val next = doc.redoStack.removeLastOrNull() ?: return
+        doc.undoStack.add(doc.value.text)
+        doc.value = TextFieldValue(next, TextRange(minOf(doc.value.selection.start, next.length)))
     }
 
     /** Menyisipkan simbol di posisi kursor (atau mengganti teks yang diblok). */
     fun insert(symbol: String) {
         val piece = if (symbol == "Tab") "    " else symbol
-        val from = value.selection.min
-        val to = value.selection.max
-        change(TextFieldValue(value.text.replaceRange(from, to, piece), TextRange(from + piece.length)))
+        val from = doc.value.selection.min
+        val to = doc.value.selection.max
+        change(TextFieldValue(doc.value.text.replaceRange(from, to, piece), TextRange(from + piece.length)))
+    }
+
+    /** Menggulir layar sampai posisi [offset] terlihat. */
+    fun scrollTo(offset: Int) {
+        val result = layout ?: return
+        val safe = offset.coerceIn(0, result.layoutInput.text.length)
+        val top = result.getLineTop(result.getLineForOffset(safe))
+        scope.launch { vScroll.animateScrollTo((top - 160f).toInt().coerceAtLeast(0)) }
+    }
+
+    /** Memindahkan kursor ke [start] (dan memblok sampai [end]), sambil mencatat posisi lama. */
+    fun jumpTo(start: Int, end: Int = start) {
+        backJumps.add(doc.value.selection.start)
+        if (backJumps.size > 50) backJumps.removeAt(0)
+        forwardJumps.clear()
+        val length = doc.value.text.length
+        doc.value = doc.value.copy(selection = TextRange(start.coerceIn(0, length), end.coerceIn(0, length)))
+        scrollTo(start)
+    }
+
+    fun jumpBack() {
+        val target = backJumps.removeLastOrNull() ?: return
+        forwardJumps.add(doc.value.selection.start)
+        val safe = target.coerceIn(0, doc.value.text.length)
+        doc.value = doc.value.copy(selection = TextRange(safe))
+        scrollTo(safe)
+    }
+
+    fun jumpForward() {
+        val target = forwardJumps.removeLastOrNull() ?: return
+        backJumps.add(doc.value.selection.start)
+        val safe = target.coerceIn(0, doc.value.text.length)
+        doc.value = doc.value.copy(selection = TextRange(safe))
+        scrollTo(safe)
+    }
+
+    fun gotoLine(number: Int) {
+        var offset = 0
+        var line = 1
+        val content = doc.value.text
+        while (line < number) {
+            val next = content.indexOf('\n', offset)
+            if (next < 0) break
+            offset = next + 1
+            line++
+        }
+        jumpTo(offset)
+    }
+
+    val matches = remember(text, query, matchCase, wholeWord, useRegex, searchOpen) {
+        if (searchOpen) findMatches(text, query, matchCase, wholeWord, useRegex) else emptyList()
+    }
+
+    /** Pindah ke hasil pencarian berikutnya atau sebelumnya. Di ujung, pencarian berputar ke ujung lain. */
+    fun findStep(forward: Boolean) {
+        if (matches.isEmpty()) return
+        val selection = doc.value.selection
+        val found = if (forward) {
+            matches.firstOrNull { it.first >= selection.max && !(it.first == selection.min && it.last + 1 == selection.max) }
+                ?: matches.first()
+        } else {
+            matches.lastOrNull { it.last + 1 <= selection.min } ?: matches.last()
+        }
+        jumpTo(found.first, found.last + 1)
+    }
+
+    /** Mengganti hasil yang sedang diblok, lalu pindah ke hasil berikutnya. */
+    fun replaceOne() {
+        val selection = doc.value.selection
+        val hit = matches.firstOrNull { it.first == selection.min && it.last + 1 == selection.max }
+        if (hit == null) {
+            findStep(forward = true)
+            return
+        }
+        val updated = doc.value.text.replaceRange(hit.first, hit.last + 1, replacement)
+        change(TextFieldValue(updated, TextRange(hit.first + replacement.length)))
+    }
+
+    fun replaceAll() {
+        if (matches.isEmpty()) return
+        val builder = StringBuilder(doc.value.text)
+        for (range in matches.asReversed()) builder.replace(range.first, range.last + 1, replacement)
+        val count = matches.size
+        change(TextFieldValue(builder.toString(), TextRange(0)))
+        Toast.makeText(context, context.getString(R.string.editor_replaced, count), Toast.LENGTH_SHORT).show()
     }
 
     fun save() {
-        val current = work ?: return
-        val content = value.text
-        val backup = AppPrefs.of(context).getBoolean(AppPrefs.KEY_BACKUP, false)
+        val current = doc.work ?: return
+        val content = doc.value.text
+        val backup = prefs.getBoolean(AppPrefs.KEY_BACKUP, false)
         scope.launch {
             val ok = withContext(Dispatchers.IO) {
                 try {
@@ -264,11 +518,27 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
                 }
             }
             if (ok) {
-                saved = content
+                doc.saved = content
                 Toast.makeText(context, R.string.editor_saved, Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, R.string.editor_save_failed, Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    /** Menulis isi editor ke berkas lain. Berkas yang sedang dibuka tidak berubah. */
+    fun saveAs(path: String) {
+        val content = doc.value.text
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    File(path).writeBytes(content.toByteArray(Charsets.UTF_8))
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            Toast.makeText(context, if (ok) R.string.editor_saved else R.string.editor_save_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -277,93 +547,605 @@ private fun TextEditor(target: EditorTarget, onBack: () -> Unit) {
     val line = text.count(0, cursor, '\n') + 1
     val column = cursor - (text.lastIndexOf('\n', cursor - 1) + 1) + 1
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
-    val numbers = remember(lineCount) { (1..lineCount).joinToString("\n") }
-    val style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, lineHeight = 18.sp, color = Ink)
-    val ready = work != null && !loading
-    // Pewarnaan kode menurut jenis berkas. Dimatikan jika "Mode cairan" di pengaturan dinyalakan.
-    val coloring = remember(target.path) {
-        val fluid = AppPrefs.of(context).getBoolean(AppPrefs.KEY_FLUID, false)
-        if (fluid) VisualTransformation.None else SyntaxTransformation(target.path.substringAfterLast('.', ""))
+    val numbers = remember(text, lineCount, layout, wrap) { gutterText(text, lineCount, if (wrap) layout else null) }
+    val style = TextStyle(
+        fontFamily = FontFamily.Monospace,
+        fontSize = fontSize.sp,
+        lineHeight = (fontSize * 1.4f).sp,
+        color = Ink,
+    )
+    // Pewarnaan kode menurut jenis berkas. Dimatikan saat "Mode halus" dinyalakan.
+    val coloring = remember(target.path, fluid, syntaxExt) {
+        if (fluid) VisualTransformation.None else SyntaxTransformation(syntaxExt ?: target.path.substringAfterLast('.', ""))
     }
 
-    val err = error
+    // Pelengkap kode: kata lain di berkas ini yang diawali huruf-huruf yang sedang diketik
+    val wordStart = remember(text, cursor) {
+        var index = cursor
+        while (index > 0 && (text[index - 1].isLetterOrDigit() || text[index - 1] == '_')) index--
+        index
+    }
+    val suggestions = remember(text, cursor, complete, readOnly) {
+        val prefix = text.substring(wordStart, cursor)
+        if (!complete || readOnly || prefix.length < 2 || text.length > HIGHLIGHT_LIMIT) {
+            emptyList()
+        } else {
+            WORD.findAll(text).map { it.value }
+                .filter { it.length > prefix.length && it.startsWith(prefix) }
+                .distinct()
+                .take(8)
+                .toList()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(Color.White).imePadding()) {
-        EditorTopBar(
-            title = FileRepository.nameOf(target.path),
-            info = "$line:$column  " + stringResource(R.string.editor_encoding),
-            onBack = { requestClose() },
-            canSave = ready,
-            onSave = { save() },
-            canUndo = ready && undoStack.isNotEmpty(),
-            onUndo = { undo() },
-            canRedo = ready && redoStack.isNotEmpty(),
-            onRedo = { redo() },
-        )
+        // Bilah atas seperti MT Manager: daftar berkas, urung, ulang, simpan, pensil, dan menu titik tiga
+        Column(modifier = Modifier.fillMaxWidth().background(HeaderBrush).statusBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 2.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { requestClose() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cd_back), tint = Color.White)
+                }
+                IconButton(onClick = { listOpen = true }) {
+                    Icon(Icons.Filled.Menu, stringResource(R.string.editor_open_files), tint = Color.White)
+                }
+                Spacer(Modifier.weight(1f))
+                val canUndo = ready && !readOnly && doc.undoStack.isNotEmpty()
+                val canRedo = ready && !readOnly && doc.redoStack.isNotEmpty()
+                IconButton(onClick = { undo() }, enabled = canUndo) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        stringResource(R.string.editor_undo),
+                        tint = if (canUndo) Color.White else Color.White.copy(alpha = 0.45f),
+                    )
+                }
+                IconButton(onClick = { redo() }, enabled = canRedo) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Redo,
+                        stringResource(R.string.editor_redo),
+                        tint = if (canRedo) Color.White else Color.White.copy(alpha = 0.45f),
+                    )
+                }
+                IconButton(onClick = { save() }, enabled = ready) {
+                    Icon(
+                        Icons.Filled.Save,
+                        stringResource(R.string.btn_save),
+                        tint = if (ready) Color.White else Color.White.copy(alpha = 0.45f),
+                    )
+                }
+                // Pensil: berpindah antara mode ubah dan mode hanya baca
+                IconButton(onClick = { readOnly = !readOnly }, enabled = ready) {
+                    Icon(
+                        if (readOnly) Icons.Filled.EditOff else Icons.Filled.Edit,
+                        stringResource(R.string.editor_read_only),
+                        tint = Color.White,
+                    )
+                }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, stringResource(R.string.cd_more), tint = Color.White)
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        containerColor = Color.White,
+                    ) {
+                        EditorMenuItem(stringResource(R.string.editor_menu_file), Icons.Filled.InsertDriveFile, arrow = true) {
+                            menuOpen = false
+                            fileMenuOpen = true
+                        }
+                        EditorMenuItem(stringResource(R.string.menu_search), Icons.Filled.Search) {
+                            menuOpen = false
+                            searchOpen = true
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_syntax), Icons.Filled.Code) {
+                            menuOpen = false
+                            syntaxOpen = true
+                        }
+                        EditorMenuItem(
+                            stringResource(R.string.editor_pos_prev),
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            enabled = backJumps.isNotEmpty(),
+                        ) {
+                            menuOpen = false
+                            jumpBack()
+                        }
+                        EditorMenuItem(
+                            stringResource(R.string.editor_pos_next),
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            enabled = forwardJumps.isNotEmpty(),
+                        ) {
+                            menuOpen = false
+                            jumpForward()
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_goto_line), Icons.Filled.FormatListNumbered) {
+                            menuOpen = false
+                            gotoOpen = true
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_wrap), Icons.Filled.WrapText, checked = wrap) {
+                            wrap = !wrap
+                            prefs.edit().putBoolean(AppPrefs.KEY_EDITOR_WRAP, wrap).apply()
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_read_only), Icons.Filled.Visibility, checked = readOnly) {
+                            readOnly = !readOnly
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_smooth), Icons.Filled.Speed, checked = fluid) {
+                            fluid = !fluid
+                            prefs.edit().putBoolean(AppPrefs.KEY_FLUID, fluid).apply()
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_complete), Icons.Filled.Spellcheck, checked = complete) {
+                            complete = !complete
+                            prefs.edit().putBoolean(AppPrefs.KEY_EDITOR_COMPLETE, complete).apply()
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_prefs), Icons.Filled.Settings) {
+                            menuOpen = false
+                            prefsOpen = true
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_close_file), Icons.Filled.Close) {
+                            menuOpen = false
+                            requestClose()
+                        }
+                    }
+                    // Isi menu "File"
+                    DropdownMenu(
+                        expanded = fileMenuOpen,
+                        onDismissRequest = { fileMenuOpen = false },
+                        containerColor = Color.White,
+                    ) {
+                        EditorMenuItem(stringResource(R.string.btn_save), Icons.Filled.Save, enabled = ready) {
+                            fileMenuOpen = false
+                            save()
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_save_as), Icons.Filled.SaveAs, enabled = ready) {
+                            fileMenuOpen = false
+                            saveAsOpen = true
+                        }
+                        EditorMenuItem(stringResource(R.string.editor_reload), Icons.Filled.Refresh) {
+                            fileMenuOpen = false
+                            scope.launch {
+                                doc.work?.discard()
+                                loadDoc(context, doc)
+                            }
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    // Tanda bintang berarti ada perubahan yang belum disimpan, seperti MT Manager
+                    text = (if (doc.dirty) "*" else "") + FileRepository.nameOf(target.path),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "$line:$column  " + stringResource(R.string.editor_encoding),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentAlignment = Alignment.TopStart,
         ) {
             when {
-                loading -> CenterMessage(stringResource(R.string.editor_loading))
+                doc.loading -> CenterMessage(stringResource(R.string.editor_loading))
                 err != null -> CenterMessage(err)
-                // Nomor baris di kiri dan teks di kanan digulir bersama. Teks tidak dilipat,
-                // jadi baris panjang digeser ke samping dan nomor baris tetap sejajar.
-                else -> Row(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = numbers,
-                        style = style,
-                        color = Disabled,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier
-                            .background(SoftGray)
-                            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                    )
-                    Box(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                // Nomor baris di kiri dan teks di kanan digulir bersama
+                else -> Row(modifier = Modifier.fillMaxSize().verticalScroll(vScroll)) {
+                    if (showNumbers) {
+                        Text(
+                            text = numbers,
+                            style = style,
+                            color = Disabled,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier
+                                .background(SoftGray)
+                                .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        )
+                    }
+                    if (wrap) {
+                        // Bungkus kata: baris panjang dilipat ke bawah
                         BasicTextField(
                             value = value,
                             onValueChange = { change(it) },
+                            readOnly = readOnly,
                             textStyle = style,
                             visualTransformation = coloring,
+                            onTextLayout = { layout = it },
                             cursorBrush = SolidColor(Accent),
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 360.dp, minHeight = 300.dp)
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 300.dp)
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                         )
+                    } else {
+                        // Tanpa bungkus kata: baris panjang digeser ke samping
+                        Box(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                            BasicTextField(
+                                value = value,
+                                onValueChange = { change(it) },
+                                readOnly = readOnly,
+                                textStyle = style,
+                                visualTransformation = coloring,
+                                onTextLayout = { layout = it },
+                                cursorBrush = SolidColor(Accent),
+                                modifier = Modifier
+                                    .defaultMinSize(minWidth = 360.dp, minHeight = 300.dp)
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
                     }
                 }
             }
         }
 
         if (ready && err == null) {
-            HorizontalDivider(color = LineColor)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .horizontalScroll(rememberScrollState()),
-            ) {
-                SYMBOLS.forEach { symbol ->
+            // Saran pelengkap kode
+            if (suggestions.isNotEmpty()) {
+                HorizontalDivider(color = LineColor)
+                Row(modifier = Modifier.fillMaxWidth().background(SoftGray).horizontalScroll(rememberScrollState())) {
+                    suggestions.forEach { word ->
+                        Text(
+                            text = word,
+                            color = Ink,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clickable {
+                                    val current = doc.value
+                                    val end = current.selection.start.coerceIn(wordStart, current.text.length)
+                                    change(
+                                        TextFieldValue(
+                                            current.text.replaceRange(wordStart, end, word),
+                                            TextRange(wordStart + word.length),
+                                        ),
+                                    )
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+
+            if (!readOnly) {
+                HorizontalDivider(color = LineColor)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    SYMBOLS.forEach { symbol ->
+                        Text(
+                            text = symbol,
+                            color = Ink,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable { insert(symbol) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    }
+                }
+            }
+
+            // Panel cari dan ganti di bawah, seperti MT Manager
+            if (searchOpen) {
+                HorizontalDivider(color = LineColor)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = symbol,
-                        color = Ink,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .clickable { insert(symbol) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        text = stringResource(R.string.editor_results, matches.size),
+                        color = Muted,
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f),
                     )
+                    SearchToggle("Cc", matchCase) { matchCase = !matchCase }
+                    SearchToggle("W", wholeWord) { wholeWord = !wholeWord }
+                    SearchToggle(".*", useRegex) { useRegex = !useRegex }
+                }
+                SearchInput(stringResource(R.string.editor_find), query) { query = it }
+                if (replaceOpen) {
+                    SearchInput(stringResource(R.string.editor_replace_with), replacement) { replacement = it }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SearchAction(stringResource(R.string.editor_prev), matches.isNotEmpty()) { findStep(forward = false) }
+                    SearchAction(stringResource(R.string.editor_find_next), matches.isNotEmpty()) { findStep(forward = true) }
+                    // Ketukan pertama membuka kolom pengganti, ketukan berikutnya mengganti hasil yang diblok
+                    SearchAction(stringResource(R.string.editor_replace), !readOnly) {
+                        if (replaceOpen) replaceOne() else replaceOpen = true
+                    }
+                    SearchAction(stringResource(R.string.editor_replace_all), replaceOpen && !readOnly && matches.isNotEmpty()) {
+                        replaceAll()
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { searchOpen = false }) {
+                        Icon(Icons.Filled.Close, stringResource(R.string.cd_close), tint = Muted)
+                    }
                 }
             }
         }
+        Spacer(Modifier.navigationBarsPadding())
     }
 
-    if (confirmExit) {
+    if (confirmClose) {
         DiscardDialog(
-            onKeep = { confirmExit = false },
+            onKeep = { confirmClose = false },
             onDiscard = {
-                confirmExit = false
+                confirmClose = false
                 close()
             },
+        )
+    }
+
+    if (gotoOpen) {
+        InputDialog(
+            title = stringResource(R.string.editor_goto_line),
+            label = "1 - $lineCount",
+            initial = line.toString(),
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                gotoOpen = false
+                typed.toIntOrNull()?.let { gotoLine(it.coerceIn(1, lineCount)) }
+            },
+            onDismiss = { gotoOpen = false },
+        )
+    }
+
+    if (saveAsOpen) {
+        InputDialog(
+            title = stringResource(R.string.editor_save_as),
+            label = stringResource(R.string.dialog_jump_hint),
+            initial = target.path,
+            confirmText = stringResource(R.string.btn_save),
+            onConfirm = { typed ->
+                saveAsOpen = false
+                if (typed.startsWith("/")) saveAs(typed)
+            },
+            onDismiss = { saveAsOpen = false },
+        )
+    }
+
+    if (syntaxOpen) {
+        AlertDialog(
+            onDismissRequest = { syntaxOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.editor_syntax), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    // Null = mengikuti nama berkas, kosong = tanpa pewarnaan
+                    val choices: List<Pair<String, String?>> = listOf<Pair<String, String?>>(
+                        stringResource(R.string.editor_syntax_auto) to null,
+                        stringResource(R.string.editor_syntax_none) to "",
+                    ) + SYNTAX_CHOICES
+                    choices.forEach { (label, ext) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    syntaxExt = ext
+                                    syntaxOpen = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = syntaxExt == ext,
+                                onClick = {
+                                    syntaxExt = ext
+                                    syntaxOpen = false
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = Accent),
+                            )
+                            Text(label, fontSize = 14.sp, color = Ink)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { syntaxOpen = false }) {
+                    Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+        )
+    }
+
+    if (prefsOpen) {
+        AlertDialog(
+            onDismissRequest = { prefsOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.editor_prefs), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.editor_font_size), fontSize = 14.sp, color = Ink, modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            fontSize = (fontSize - 1).coerceAtLeast(9)
+                            prefs.edit().putInt(AppPrefs.KEY_EDITOR_FONT, fontSize).apply()
+                        }) { Text("-", color = Accent, fontSize = 18.sp) }
+                        Text(fontSize.toString(), fontSize = 15.sp, color = Ink)
+                        TextButton(onClick = {
+                            fontSize = (fontSize + 1).coerceAtMost(28)
+                            prefs.edit().putInt(AppPrefs.KEY_EDITOR_FONT, fontSize).apply()
+                        }) { Text("+", color = Accent, fontSize = 18.sp) }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            showNumbers = !showNumbers
+                            prefs.edit().putBoolean(AppPrefs.KEY_EDITOR_NUMBERS, showNumbers).apply()
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.editor_line_numbers), fontSize = 14.sp, color = Ink, modifier = Modifier.weight(1f))
+                        Icon(
+                            if (showNumbers) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                            contentDescription = null,
+                            tint = if (showNumbers) Ink else Muted,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { prefsOpen = false }) {
+                    Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+        )
+    }
+
+    // Daftar berkas yang sedang terbuka. "Perkecil" kembali ke pengelola berkas tanpa menutup apa pun.
+    if (listOpen) {
+        AlertDialog(
+            onDismissRequest = { listOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.tool_text_editor), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    EditorSession.docs.toList().forEach { other ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (other === doc) SelectTint else Color.Transparent)
+                                .clickable {
+                                    listOpen = false
+                                    EditorSession.current = other
+                                }
+                                .padding(start = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
+                                Text(
+                                    text = (if (other.dirty) "*" else "") + FileRepository.nameOf(other.target.path),
+                                    color = Ink,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = FileRepository.parentOf(other.target.path),
+                                    color = Muted,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            // Berkas dengan perubahan yang belum disimpan tidak ditutup dari sini
+                            IconButton(onClick = { EditorSession.close(other) }, enabled = !other.dirty && other !== doc) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    stringResource(R.string.editor_close_file),
+                                    tint = if (!other.dirty && other !== doc) Muted else Disabled,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    listOpen = false
+                    onExit()
+                }) {
+                    Text(stringResource(R.string.editor_minimize), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { listOpen = false }) {
+                    Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+        )
+    }
+}
+
+/** Satu baris menu titik tiga editor. [checked] menampilkan kotak centang, [arrow] menampilkan panah submenu. */
+@Composable
+private fun EditorMenuItem(
+    label: String,
+    icon: ImageVector,
+    checked: Boolean? = null,
+    arrow: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val trailing: (@Composable () -> Unit)? = when {
+        checked != null -> {
+            {
+                Icon(
+                    imageVector = if (checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
+                    contentDescription = null,
+                    tint = if (checked) Ink else Muted,
+                )
+            }
+        }
+        arrow -> {
+            { Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = Muted) }
+        }
+        else -> null
+    }
+    DropdownMenuItem(
+        text = { Text(text = label, color = if (enabled) Ink else Disabled, fontSize = 15.sp) },
+        onClick = onClick,
+        enabled = enabled,
+        leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = if (enabled) MenuIcon else Disabled) },
+        trailingIcon = trailing,
+    )
+}
+
+/** Tombol kecil di panel cari: huruf besar-kecil, kata utuh, atau regex. Tebal saat aktif. */
+@Composable
+private fun SearchToggle(label: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = if (active) Ink else Disabled,
+        fontSize = 13.sp,
+        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    )
+}
+
+/** Kolom isian satu baris di panel cari, dengan garis bawah. */
+@Composable
+private fun SearchInput(label: String, value: String, onChange: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = label, color = Muted, fontSize = 12.sp, modifier = Modifier.width(92.dp))
+            BasicTextField(
+                value = value,
+                onValueChange = onChange,
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 14.sp, color = Ink),
+                cursorBrush = SolidColor(Accent),
+                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+            )
+        }
+        HorizontalDivider(color = Accent)
+    }
+}
+
+@Composable
+private fun SearchAction(label: String, enabled: Boolean, onClick: () -> Unit) {
+    TextButton(onClick = onClick, enabled = enabled) {
+        Text(
+            text = label.uppercase(),
+            color = if (enabled) Accent else Disabled,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }

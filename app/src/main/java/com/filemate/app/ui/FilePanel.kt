@@ -144,6 +144,8 @@ data class ListStyle(
     val thumbMaxBytes: Long = 10L * 1024 * 1024,
     /** Gambar mini yang belum selesai dalam waktu ini (milidetik) dibatalkan. */
     val thumbTimeoutMs: Long = 10_000L,
+    /** Menampilkan izin (rwx) di bawah nama berkas pada folder sistem. */
+    val showPerms: Boolean = true,
 )
 
 /** Folder yang isinya folder bernama paket aplikasi. */
@@ -226,7 +228,7 @@ private fun FileRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = subtitle(item),
+                text = subtitle(item, style.showPerms),
                 color = Muted,
                 fontSize = (11 * style.scale).sp,
                 lineHeight = (13 * style.scale).sp,
@@ -426,7 +428,12 @@ private fun loadApkIcon(context: Context, path: String): ImageBitmap? = try {
     null
 }
 
-private fun subtitle(item: FileItem): String {
-    val date = formatDate(item.modified)
-    return if (item.isDir) date else "$date  ${formatSize(item.size)}"
+/**
+ * Baris kecil di bawah nama. Di folder sistem (daftar lewat root), berkas menampilkan izin dan
+ * ukurannya seperti MT Manager, kecuali [showPerm] dimatikan di pengaturan.
+ */
+private fun subtitle(item: FileItem, showPerm: Boolean): String {
+    if (item.isDir) return formatDate(item.modified)
+    if (showPerm && item.perm.isNotEmpty()) return "${item.perm}  ${formatSize(item.size)}"
+    return "${formatDate(item.modified)}  ${formatSize(item.size)}"
 }

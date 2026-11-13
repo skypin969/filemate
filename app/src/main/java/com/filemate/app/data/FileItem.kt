@@ -8,6 +8,8 @@ data class FileItem(
     val isLink: Boolean,
     val size: Long,
     val modified: Long,
+    /** Izin seperti "drwxr-xr-x". Hanya terisi untuk daftar yang dibaca lewat root. */
+    val perm: String = "",
 ) {
     val isApk: Boolean
         get() = !isDir && name.endsWith(".apk", ignoreCase = true)

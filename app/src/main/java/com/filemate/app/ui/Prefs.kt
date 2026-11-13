@@ -59,6 +59,12 @@ object AppPrefs {
     /** Mode cairan: pewarnaan kode di editor dimatikan supaya lebih ringan. */
     const val KEY_FLUID = "editor_fluid"
 
+    /** Editor teks: bungkus kata, pelengkap kode, ukuran huruf, dan nomor baris. */
+    const val KEY_EDITOR_WRAP = "editor_wrap"
+    const val KEY_EDITOR_COMPLETE = "editor_complete"
+    const val KEY_EDITOR_FONT = "editor_font"
+    const val KEY_EDITOR_NUMBERS = "editor_numbers"
+
     /** Recycle Bin: fitur aktif, dicentang secara bawaan, dan peringatan merah saat hapus permanen. */
     const val KEY_TRASH_ON = "trash_enabled"
     const val KEY_TRASH_DEFAULT = "trash_default"

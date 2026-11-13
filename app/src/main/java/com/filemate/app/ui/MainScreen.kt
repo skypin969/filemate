@@ -218,6 +218,7 @@ fun MainScreen(
     var toolTargets by remember { mutableStateOf<List<FileItem>?>(null) }
     var pendingTool by remember { mutableStateOf<Pair<FileTool, FileItem>?>(null) }
     val openFailed = stringResource(R.string.msg_cannot_open)
+    val defaultSaved = stringResource(R.string.open_default_saved)
     val rangeHint = stringResource(R.string.msg_range_hint)
     val shortcutAsked = stringResource(R.string.msg_shortcut_asked)
     val shortcutFailed = stringResource(R.string.msg_shortcut_failed)
@@ -279,6 +280,57 @@ fun MainScreen(
         stringResource(if (writable) R.string.top_rw else R.string.top_ro),
     )
 
+    // Menjalankan satu cara buka dari dialog "Buka dengan" untuk berkas [item]
+    fun runOpenMode(item: FileItem, mode: OpenMode) {
+        when (mode) {
+            OpenMode.TEXT, OpenMode.XML, OpenMode.SVG ->
+                onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
+            OpenMode.MARKDOWN -> onOpenPreview(PreviewTarget(item.path, markdown = true))
+            OpenMode.HEX ->
+                onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode))
+            OpenMode.APK_INFO -> vm.openApk(item.path)
+            // Penampil arsip: isi arsip dibuka di panel seperti folder
+            OpenMode.ARCHIVE ->
+                if (item.extension.lowercase() in Archive.BROWSABLE) {
+                    vm.openFolder(state.active, item.path)
+                } else {
+                    vm.notify(notReady)
+                }
+            OpenMode.SCRIPT -> onOpenTerminal(
+                TerminalTarget(
+                    cwd = FileRepository.parentOf(item.path),
+                    command = "sh " + RootShell.quote(item.path),
+                    root = state.rootMode,
+                ),
+            )
+            OpenMode.IMAGE -> openFileAs(context, item, "image/*")
+            OpenMode.MUSIC -> openFileAs(context, item, "audio/*")
+            OpenMode.VIDEO -> openFileAs(context, item, "video/*")
+            OpenMode.PDF -> openFileAs(context, item, "application/pdf")
+            OpenMode.FONT -> onOpenTool(ToolKind.FONT, item.path)
+            OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
+            // Fungsi Jar: mengubah JAR menjadi DEX di folder kerja Filemate
+            OpenMode.JAR -> {
+                vm.notify(jarWorking)
+                scope.launch {
+                    val out = File(FileRepository.FILEMATE_DIR, item.name.substringBeforeLast('.') + "-dex")
+                    val minSdk = listPrefs.getInt(AppPrefs.KEY_JAR_MIN_SDK, Jar2Dex.DEFAULT_MIN_SDK)
+                    val ok = withContext(Dispatchers.IO) {
+                        try {
+                            Jar2Dex.convert(File(item.path), out, minSdk)
+                            true
+                        } catch (e: Throwable) {
+                            false
+                        }
+                    }
+                    vm.notify(if (ok) jarDone.format(out.path) else jarFailed)
+                    vm.reloadAll()
+                }
+            }
+            else -> vm.notify(notReady)
+        }
+    }
+
     // Membuka satu berkas (bukan folder) dengan cara yang cocok untuk jenisnya
     fun openFileItem(index: Int, item: FileItem) {
         vm.setActive(index)
@@ -294,7 +346,11 @@ fun MainScreen(
                 onOpenPreview(PreviewTarget(item.path, markdown = false))
             // Berkas teks langsung dibuka di editor. Jenis lain memunculkan pilihan "Buka dengan".
             item.extension in TEXT_EXT -> onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
-            else -> openWithTarget = item
+            else -> {
+                // Cara buka bawaan yang pernah dipilih user (tekan lama di "Buka dengan") dipakai langsung
+                val preset = OpenDefaults.get(context, item.extension)
+                if (preset != null) runOpenMode(item, preset) else openWithTarget = item
+            }
         }
     }
 
@@ -393,7 +449,9 @@ fun MainScreen(
                 },
                 onNewText = {
                     scope.launch { drawerState.close() }
-                    newTextOpen = true
+                    // Jika editor sedang diperkecil, alat ini membukanya lagi. Kalau tidak, buat berkas baru.
+                    val minimized = EditorSession.current
+                    if (minimized != null) onOpenEditor(minimized.target) else newTextOpen = true
                 },
                 onNotReady = {
                     scope.launch { drawerState.close() }
@@ -625,63 +683,26 @@ fun MainScreen(
         )
     }
 
-    // Dialog "Buka dengan": kotak ikon seperti NP Manager
+    // Dialog "Buka dengan": kotak ikon seperti MT Manager
     openWithTarget?.let { item ->
         fun done(action: () -> Unit) {
             openWithTarget = null
             action()
         }
         OpenWithDialog(
+            extension = item.extension,
             onDismiss = { openWithTarget = null },
             onSystem = { done { openWith(context, item) } },
-            onPick = { mode ->
+            onSystemAs = { mime -> done { openFileAs(context, item, mime) } },
+            onPick = { mode -> done { runOpenMode(item, mode) } },
+            // Tekan lama: dijadikan cara buka bawaan untuk akhiran berkas ini, lalu langsung dipakai
+            onMakeDefault = { mode ->
                 done {
-                    when (mode) {
-                        OpenMode.TEXT, OpenMode.XML, OpenMode.SVG ->
-                            onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
-                        OpenMode.MARKDOWN -> onOpenPreview(PreviewTarget(item.path, markdown = true))
-                        OpenMode.HEX ->
-                            onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode))
-                        OpenMode.APK_INFO -> vm.openApk(item.path)
-                        // Penampil arsip: isi arsip dibuka di panel seperti folder
-                        OpenMode.ARCHIVE ->
-                            if (item.extension.lowercase() in Archive.BROWSABLE) {
-                                vm.openFolder(state.active, item.path)
-                            } else {
-                                vm.notify(notReady)
-                            }
-                        OpenMode.SCRIPT -> onOpenTerminal(
-                            TerminalTarget(
-                                cwd = FileRepository.parentOf(item.path),
-                                command = "sh " + RootShell.quote(item.path),
-                                root = state.rootMode,
-                            ),
-                        )
-                        OpenMode.IMAGE -> openFileAs(context, item, "image/*")
-                        OpenMode.MUSIC -> openFileAs(context, item, "audio/*")
-                        OpenMode.PDF -> openFileAs(context, item, "application/pdf")
-                        OpenMode.FONT -> onOpenTool(ToolKind.FONT, item.path)
-                        OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
-                        // Fungsi Jar: mengubah JAR menjadi DEX di folder kerja Filemate
-                        OpenMode.JAR -> {
-                            vm.notify(jarWorking)
-                            scope.launch {
-                                val out = File(FileRepository.FILEMATE_DIR, item.name.substringBeforeLast('.') + "-dex")
-                                val minSdk = listPrefs.getInt(AppPrefs.KEY_JAR_MIN_SDK, Jar2Dex.DEFAULT_MIN_SDK)
-                                val ok = withContext(Dispatchers.IO) {
-                                    try {
-                                        Jar2Dex.convert(File(item.path), out, minSdk)
-                                        true
-                                    } catch (e: Throwable) {
-                                        false
-                                    }
-                                }
-                                vm.notify(if (ok) jarDone.format(out.path) else jarFailed)
-                                vm.reloadAll()
-                            }
-                        }
-                        else -> vm.notify(notReady)
+                    if (item.extension.isNotEmpty()) {
+                        OpenDefaults.set(context, item.extension, mode)
+                        vm.notify(defaultSaved.format("." + item.extension.lowercase()))
                     }
+                    runOpenMode(item, mode)
                 }
             },
         )

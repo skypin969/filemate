@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +49,8 @@ private class Ownership(
     val octal: String,    // contoh: 770
     val owner: String,
     val group: String,
+    /** Angka izin khusus: 4 setel UID, 2 setel GID, 1 lengket. Bisa dijumlah. */
+    val special: Int = 0,
 )
 
 /** Isi sebuah folder: jumlah berkas, jumlah folder, dan ukuran totalnya. */
@@ -57,7 +61,8 @@ private fun readOwnership(path: String, root: Boolean): Ownership? {
     if (result.exitCode != 0) return null
     val parts = result.output.trim().lines().lastOrNull()?.split('|') ?: return null
     if (parts.size != 4) return null
-    return Ownership(parts[0], parts[1].takeLast(3).padStart(3, '0'), parts[2], parts[3])
+    val digits = parts[1].padStart(4, '0').takeLast(4)
+    return Ownership(parts[0], digits.takeLast(3), parts[2], parts[3], special = digits[0].digitToIntOrNull() ?: 0)
 }
 
 /** Menghitung isi folder. Berhenti di 50.000 item supaya tidak lama. Null jika folder tidak bisa dibaca. */
@@ -118,6 +123,7 @@ fun AttributesDialog(
     var hashes by remember { mutableStateOf<String?>(null) }
     var hashing by remember { mutableStateOf(false) }
     var editPerm by remember { mutableStateOf(false) }
+    var editOwner by remember { mutableStateOf(false) }
     // Naik setiap izin diubah, supaya izin dibaca ulang
     var reload by remember { mutableStateOf(0) }
 
@@ -179,8 +185,24 @@ fun AttributesDialog(
                         )
                     }
                 }
-                AttrRow(stringResource(R.string.attr_owner), perm?.owner ?: "-")
-                AttrRow(stringResource(R.string.attr_group), perm?.group ?: "-")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        AttrRow(stringResource(R.string.attr_owner), perm?.owner ?: "-")
+                        AttrRow(stringResource(R.string.attr_group), perm?.group ?: "-")
+                    }
+                    // Mengganti pemilik dan grup butuh akses root
+                    if (perm != null && root) {
+                        Text(
+                            text = stringResource(R.string.attr_change),
+                            color = Accent,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable { editOwner = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
 
                 if (item.isDir && folderStats != null) {
                     AttrRow(stringResource(R.string.attr_file_count), folderStats.files.toString())
@@ -233,18 +255,43 @@ fun AttributesDialog(
         PermissionDialog(
             item = item,
             current = perm,
-            onApply = { octal, recursive ->
+            onApply = { octal, toFiles, toFolders ->
                 editPerm = false
                 scope.launch {
                     withContext(Dispatchers.IO) {
-                        val flag = if (recursive) "-R " else ""
-                        RootShell.exec("chmod $flag$octal ${RootShell.quote(item.path)}", root)
+                        val path = RootShell.quote(item.path)
+                        RootShell.exec("chmod $octal $path", root)
+                        // "Juga berlaku untuk semua file / folder" di dalamnya
+                        if (toFiles) RootShell.exec("find $path -type f -exec chmod $octal {} +", root)
+                        if (toFolders) RootShell.exec("find $path -mindepth 1 -type d -exec chmod $octal {} +", root)
                     }
                     reload++
                     onChanged()
                 }
             },
             onDismiss = { editPerm = false },
+        )
+    }
+
+    if (editOwner && perm != null) {
+        OwnerDialog(
+            item = item,
+            current = perm,
+            onApply = { newOwner, newGroup, toFiles, toFolders ->
+                editOwner = false
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        val path = RootShell.quote(item.path)
+                        val who = "$newOwner:$newGroup"
+                        RootShell.exec("chown $who $path", root)
+                        if (toFiles) RootShell.exec("find $path -type f -exec chown $who {} +", root)
+                        if (toFolders) RootShell.exec("find $path -mindepth 1 -type d -exec chown $who {} +", root)
+                    }
+                    reload++
+                    onChanged()
+                }
+            },
+            onDismiss = { editOwner = false },
         )
     }
 }
@@ -270,7 +317,7 @@ private fun AttrRow(label: String, value: String) {
 private fun PermissionDialog(
     item: FileItem,
     current: Ownership,
-    onApply: (String, Boolean) -> Unit,
+    onApply: (String, Boolean, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Sembilan bit izin, urutannya: pemilik baca/tulis/jalankan, grup, lalu lainnya
@@ -280,11 +327,14 @@ private fun PermissionDialog(
             List(9) { i -> ((start.getOrElse(i / 3) { 0 } shr (2 - i % 3)) and 1) == 1 },
         )
     }
-    var recursive by remember { mutableStateOf(false) }
+    // Izin khusus: setel UID (4), setel GID (2), lengket (1)
+    var special by remember { mutableStateOf(current.special) }
+    var toFiles by remember { mutableStateOf(false) }
+    var toFolders by remember { mutableStateOf(false) }
     // Untuk folder sistem, tombol OK baru aktif setelah user mencentang bahwa dia paham risikonya
     val system = FileRepository.isSystemPath(item.path)
     var understood by remember { mutableStateOf(false) }
-    val octal = (0 until 3).joinToString("") { who ->
+    val octal = special.toString() + (0 until 3).joinToString("") { who ->
         var digit = 0
         if (bits[who * 3]) digit += 4
         if (bits[who * 3 + 1]) digit += 2
@@ -340,20 +390,27 @@ private fun PermissionDialog(
                 Text("${stringResource(R.string.attr_owner)}  ${current.owner}", color = Muted, fontSize = 14.sp)
                 Spacer(Modifier.height(6.dp))
                 Text("${stringResource(R.string.attr_group)}  ${current.group}", color = Muted, fontSize = 14.sp)
-                if (item.isDir) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { recursive = !recursive },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = recursive,
-                            onCheckedChange = { recursive = it },
-                            colors = CheckboxDefaults.colors(checkedColor = Accent),
-                        )
-                        Text(stringResource(R.string.perm_recursive), color = Ink, fontSize = 14.sp)
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.perm_special), color = Muted, fontSize = 13.sp)
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf(R.string.perm_setuid to 4, R.string.perm_setgid to 2, R.string.perm_sticky to 1).forEach { (label, bit) ->
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { special = special xor bit },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = (special and bit) != 0,
+                                onCheckedChange = { special = special xor bit },
+                                colors = CheckboxDefaults.colors(checkedColor = Accent),
+                            )
+                            Text(text = stringResource(label), color = Ink, fontSize = 12.sp, maxLines = 1)
+                        }
                     }
+                }
+                if (item.isDir) {
+                    ApplyInsideRows(toFiles, { toFiles = it }, toFolders, { toFolders = it })
                 }
                 if (system) {
                     Spacer(Modifier.height(8.dp))
@@ -376,7 +433,135 @@ private fun PermissionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onApply(octal, recursive) }, enabled = !system || understood) {
+            TextButton(onClick = { onApply(octal, toFiles, toFolders) }, enabled = !system || understood) {
+                Text(stringResource(R.string.btn_ok), color = Accent, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel), color = Accent)
+            }
+        },
+    )
+}
+
+/** Dua centang "Juga berlaku untuk semua file" dan "... semua folder", seperti MT Manager. */
+@Composable
+private fun ApplyInsideRows(
+    toFiles: Boolean,
+    onFiles: (Boolean) -> Unit,
+    toFolders: Boolean,
+    onFolders: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onFiles(!toFiles) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = toFiles, onCheckedChange = onFiles, colors = CheckboxDefaults.colors(checkedColor = Accent))
+        Text(stringResource(R.string.perm_apply_files), color = Ink, fontSize = 14.sp)
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onFolders(!toFolders) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = toFolders, onCheckedChange = onFolders, colors = CheckboxDefaults.colors(checkedColor = Accent))
+        Text(stringResource(R.string.perm_apply_folders), color = Ink, fontSize = 14.sp)
+    }
+}
+
+/**
+ * Dialog ganti pemilik dan grup. Isinya nama (misalnya root, system, shell) atau angka UID/GID.
+ * Hanya huruf, angka, dan garis bawah yang diterima, supaya aman dipakai di perintah shell.
+ */
+@Composable
+private fun OwnerDialog(
+    item: FileItem,
+    current: Ownership,
+    onApply: (String, String, Boolean, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var owner by remember { mutableStateOf(current.owner) }
+    var group by remember { mutableStateOf(current.group) }
+    var toFiles by remember { mutableStateOf(false) }
+    var toFolders by remember { mutableStateOf(false) }
+    val system = FileRepository.isSystemPath(item.path)
+    var understood by remember { mutableStateOf(false) }
+    val safe = Regex("[A-Za-z0-9_]+")
+    val valid = safe.matches(owner.trim()) && safe.matches(group.trim())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = { Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.attr_owner), color = Muted, fontSize = 13.sp)
+                TextField(
+                    value = owner,
+                    onValueChange = { owner = it },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Accent,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.attr_group), color = Muted, fontSize = 13.sp)
+                TextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Accent,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // Pilihan cepat untuk pemilik dan grup yang paling sering dipakai
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf("root", "system", "shell", "media_rw").forEach { name ->
+                        Text(
+                            text = name,
+                            color = Accent,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable {
+                                    owner = name
+                                    group = name
+                                }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                if (item.isDir) {
+                    ApplyInsideRows(toFiles, { toFiles = it }, toFolders, { toFolders = it })
+                }
+                if (system) {
+                    Text(
+                        text = stringResource(R.string.warn_system),
+                        color = Danger,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { understood = !understood },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = understood, onCheckedChange = { understood = it })
+                        Text(stringResource(R.string.warn_understand), color = Ink, fontSize = 14.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onApply(owner.trim(), group.trim(), toFiles, toFolders) },
+                enabled = valid && (!system || understood),
+            ) {
                 Text(stringResource(R.string.btn_ok), color = Accent, fontWeight = FontWeight.SemiBold)
             }
         },

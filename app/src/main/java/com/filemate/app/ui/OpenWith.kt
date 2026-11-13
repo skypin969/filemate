@@ -1,5 +1,25 @@
 package com.filemate.app.ui
 
+import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,7 +72,7 @@ import com.filemate.app.R
 
 /** Cara membuka berkas dari dialog "Buka dengan". */
 enum class OpenMode {
-    TEXT, ARCHIVE, IMAGE, HEX, MUSIC, XML, DEX, ARSC, APK_INFO, APKS, SCRIPT, FONT,
+    TEXT, ARCHIVE, IMAGE, HEX, MUSIC, VIDEO, XML, DEX, ARSC, APK_INFO, APKS, SCRIPT, FONT,
     SIGNATURE, SVG, JAR, PDF, CLASS, MARKDOWN, DATABASE, NINE_PATCH,
 }
 
@@ -69,6 +89,7 @@ private val CHOICES = listOf(
     OpenChoice(OpenMode.IMAGE, R.string.open_image, Icons.Filled.Image),
     OpenChoice(OpenMode.HEX, R.string.open_hex, Icons.Filled.DataObject),
     OpenChoice(OpenMode.MUSIC, R.string.open_music, Icons.Filled.MusicNote),
+    OpenChoice(OpenMode.VIDEO, R.string.open_video, Icons.Filled.Movie),
     OpenChoice(OpenMode.XML, R.string.open_xml, Icons.Filled.Code),
     OpenChoice(OpenMode.DEX, R.string.open_dex, Icons.Filled.Widgets),
     OpenChoice(OpenMode.ARSC, R.string.open_arsc, Icons.Filled.GridOn),
@@ -86,38 +107,118 @@ private val CHOICES = listOf(
     OpenChoice(OpenMode.NINE_PATCH, R.string.open_nine_patch, Icons.Filled.Photo),
 )
 
+/** Cara buka bawaan per akhiran berkas, disimpan di pengaturan. Diatur dengan menekan lama ikon di dialog "Buka dengan". */
+object OpenDefaults {
+    private const val PREFIX = "open_default_"
+
+    fun get(context: Context, extension: String): OpenMode? {
+        if (extension.isEmpty()) return null
+        val name = AppPrefs.of(context).getString(PREFIX + extension.uppercase(), null) ?: return null
+        return OpenMode.entries.firstOrNull { it.name == name }
+    }
+
+    fun set(context: Context, extension: String, mode: OpenMode) {
+        if (extension.isEmpty()) return
+        AppPrefs.of(context).edit().putString(PREFIX + extension.uppercase(), mode.name).apply()
+    }
+
+    fun remove(context: Context, extension: String) {
+        AppPrefs.of(context).edit().remove(PREFIX + extension.uppercase()).apply()
+    }
+
+    /** Semua cara buka bawaan yang tersimpan: akhiran berkas dan caranya, urut abjad. */
+    fun all(context: Context): List<Pair<String, OpenMode>> =
+        AppPrefs.of(context).all.entries
+            .filter { it.key.startsWith(PREFIX) }
+            .mapNotNull { entry ->
+                val mode = OpenMode.entries.firstOrNull { it.name == entry.value } ?: return@mapNotNull null
+                entry.key.removePrefix(PREFIX) to mode
+            }
+            .sortedBy { it.first }
+
+    /** Nama cara buka untuk ditampilkan. */
+    fun labelOf(mode: OpenMode): Int = CHOICES.firstOrNull { it.mode == mode }?.label ?: R.string.open_title
+}
+
 /**
- * Dialog "Buka dengan..." seperti NP Manager: kotak ikon tiga kolom.
- * Tombol "Saran sistem" membuka pilihan aplikasi bawaan Android.
+ * Dialog "Buka dengan..." seperti MT Manager: kotak ikon tiga kolom, tombol cari dan bantuan di atas,
+ * serta tombol "Jenis" untuk membuka lewat aplikasi lain menurut jenisnya (teks, gambar, video, audio, semua).
+ * Menekan lama satu ikon menjadikannya cara buka bawaan untuk akhiran berkas [extension].
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OpenWithDialog(
+    extension: String,
     onPick: (OpenMode) -> Unit,
+    onMakeDefault: (OpenMode) -> Unit,
     onSystem: () -> Unit,
+    onSystemAs: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var searching by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var typeMenu by remember { mutableStateOf(false) }
+    var helpOpen by remember { mutableStateOf(false) }
+    var manageOpen by remember { mutableStateOf(false) }
+    // Naik setiap ada cara buka bawaan yang dihapus, supaya daftarnya dibaca ulang
+    var defaultsVersion by remember { mutableStateOf(0) }
+    val labeled = CHOICES.map { it to stringResource(it.label) }
+    val shown = labeled.filter { query.isBlank() || it.second.contains(query.trim(), ignoreCase = true) }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-            Column(modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)) {
-                Text(
-                    text = stringResource(R.string.open_title),
-                    color = Ink,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
-                )
+            Column(modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (searching) {
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 16.sp, color = Ink),
+                            cursorBrush = SolidColor(Accent),
+                            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                        )
+                        IconButton(onClick = {
+                            searching = false
+                            query = ""
+                        }) {
+                            Icon(Icons.Filled.Close, stringResource(R.string.cd_close), tint = Muted)
+                        }
+                    } else {
+                        Text(
+                            text = stringResource(R.string.open_title),
+                            color = Ink,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { searching = true }) {
+                            Icon(Icons.Filled.Search, stringResource(R.string.menu_search), tint = Muted)
+                        }
+                        IconButton(onClick = { helpOpen = true }) {
+                            Icon(Icons.Filled.HelpOutline, stringResource(R.string.open_help_title), tint = Muted)
+                        }
+                    }
+                }
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 560.dp)
+                        .heightIn(max = 520.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
-                    CHOICES.chunked(3).forEach { rowChoices ->
+                    shown.chunked(3).forEach { rowChoices ->
                         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)) {
-                            rowChoices.forEach { choice ->
+                            rowChoices.forEach { (choice, label) ->
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { onPick(choice.mode) }
+                                        .combinedClickable(
+                                            onClick = { onPick(choice.mode) },
+                                            onLongClick = { onMakeDefault(choice.mode) },
+                                        )
                                         .padding(vertical = 10.dp, horizontal = 2.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
@@ -129,7 +230,7 @@ fun OpenWithDialog(
                                     )
                                     Spacer(Modifier.height(6.dp))
                                     Text(
-                                        text = stringResource(choice.label),
+                                        text = label,
                                         color = Muted,
                                         fontSize = 12.sp,
                                         lineHeight = 14.sp,
@@ -146,14 +247,104 @@ fun OpenWithDialog(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    TextButton(onClick = onSystem) {
-                        Text(stringResource(R.string.open_system), color = Accent, fontWeight = FontWeight.SemiBold)
+                    Box {
+                        TextButton(onClick = { typeMenu = true }) {
+                            Text(stringResource(R.string.open_type), color = Accent, fontWeight = FontWeight.SemiBold)
+                        }
+                        // Membuka lewat aplikasi lain di HP, menurut jenis yang dipilih
+                        DropdownMenu(
+                            expanded = typeMenu,
+                            onDismissRequest = { typeMenu = false },
+                            containerColor = Color.White,
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.open_system), color = Ink, fontSize = 15.sp) },
+                                onClick = {
+                                    typeMenu = false
+                                    onSystem()
+                                },
+                            )
+                            listOf(
+                                R.string.open_type_text to "text/plain",
+                                R.string.open_type_image to "image/*",
+                                R.string.open_type_video to "video/*",
+                                R.string.open_type_audio to "audio/*",
+                                R.string.open_type_all to "*/*",
+                            ).forEach { (label, mime) ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(label), color = Ink, fontSize = 15.sp) },
+                                    onClick = {
+                                        typeMenu = false
+                                        onSystemAs(mime)
+                                    },
+                                )
+                            }
+                        }
                     }
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.btn_cancel), color = Accent, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
+    }
+
+    if (helpOpen) {
+        AlertDialog(
+            onDismissRequest = { helpOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.open_help_title), fontWeight = FontWeight.SemiBold) },
+            text = { Text(stringResource(R.string.open_help_body), color = Ink, fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(onClick = { helpOpen = false }) {
+                    Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    helpOpen = false
+                    manageOpen = true
+                }) {
+                    Text(stringResource(R.string.open_manage), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+        )
+    }
+
+    if (manageOpen) {
+        val defaults = remember(defaultsVersion) { OpenDefaults.all(context) }
+        AlertDialog(
+            onDismissRequest = { manageOpen = false },
+            containerColor = Color.White,
+            title = { Text(stringResource(R.string.open_defaults_title), fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    if (defaults.isEmpty()) {
+                        Text(stringResource(R.string.open_defaults_empty), color = Muted, fontSize = 14.sp)
+                    }
+                    defaults.forEach { (ext, mode) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "." + ext.lowercase() + "  →  " + stringResource(OpenDefaults.labelOf(mode)),
+                                color = Ink,
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = {
+                                OpenDefaults.remove(context, ext)
+                                defaultsVersion++
+                            }) {
+                                Icon(Icons.Filled.Close, stringResource(R.string.btn_delete), tint = Muted)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { manageOpen = false }) {
+                    Text(stringResource(R.string.btn_close), color = Accent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+        )
     }
 }
