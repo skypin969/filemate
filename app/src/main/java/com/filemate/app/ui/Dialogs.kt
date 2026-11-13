@@ -162,7 +162,7 @@ fun ConfirmDialog(
 ) {
     val title = when (action) {
         is FileAction.Delete -> stringResource(R.string.btn_delete)
-        is FileAction.Paste -> stringResource(R.string.confirm_paste_title)
+        is FileAction.Paste -> stringResource(if (action.move) R.string.btn_move else R.string.btn_copy)
         is FileAction.Rename -> stringResource(R.string.confirm_rename_title)
         is FileAction.NewFolder -> stringResource(R.string.confirm_new_title)
         is FileAction.NewFile -> stringResource(R.string.confirm_new_title)
@@ -173,7 +173,16 @@ fun ConfirmDialog(
         } else {
             stringResource(R.string.confirm_delete_many, action.paths.size)
         }
-        is FileAction.Paste -> stringResource(R.string.confirm_paste_body, action.sources.size)
+        // Seperti MT Manager: sebut nama berkas dan folder tujuannya
+        is FileAction.Paste -> {
+            val what = action.sources.singleOrNull()?.substringAfterLast('/')
+                ?: stringResource(R.string.confirm_items, action.sources.size)
+            stringResource(
+                if (action.move) R.string.confirm_move_body else R.string.confirm_copy_body,
+                what,
+                action.destDir.trimEnd('/') + "/",
+            )
+        }
         is FileAction.Rename -> stringResource(R.string.confirm_rename_body)
         is FileAction.NewFolder -> stringResource(R.string.confirm_new_body)
         is FileAction.NewFile -> stringResource(R.string.confirm_new_body)
@@ -266,6 +275,7 @@ fun ApkDialog(
     onRepack: () -> Unit,
     onSign: () -> Unit,
     onInstall: () -> Unit,
+    onBrowse: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -347,6 +357,14 @@ fun ApkDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.apk_btn_install), fontSize = 13.sp)
+                }
+                // Membuka isi APK di panel seperti folder (tombol "Lihat" di MT Manager)
+                OutlinedButton(
+                    onClick = onBrowse,
+                    enabled = !info.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.apk_btn_browse), fontSize = 13.sp)
                 }
             }
         },

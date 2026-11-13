@@ -16,6 +16,7 @@ import com.filemate.app.apk.ApkTools
 import com.filemate.app.data.Archive
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
+import com.filemate.app.data.FileTools
 import com.filemate.app.data.RootShell
 import com.filemate.app.data.Trash
 import com.filemate.app.mcp.McpService
@@ -67,6 +68,8 @@ sealed interface AppDialog {
     data class Confirm(val action: FileAction, val system: Boolean) : AppDialog
     data class Apk(val path: String) : AppDialog
     data class Attributes(val item: FileItem) : AppDialog
+    /** Dialog "Ekstrak" untuk berkas arsip di [path]. */
+    data class Extract(val path: String) : AppDialog
     data object TypeFilterPicker : AppDialog
 }
 
@@ -97,6 +100,8 @@ data class UiState(
     val dialog: AppDialog? = null,
     val apk: ApkInfo? = null,
     val message: String? = null,
+    /** Berkas yang baru saja disalin atau dipindah. Namanya diberi warna di daftar supaya mudah ditemukan. */
+    val fresh: Set<String> = emptySet(),
 )
 
 private val MEDIA_EXT = setOf(
@@ -306,7 +311,10 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                 // dan untuk Android/data serta Android/obb yang disembunyikan Android dari aplikasi biasa.
                 // Flashdisk dan kartu SD di /storage juga dibaca langsung.
                 val inStorage = path.startsWith("/storage/emulated") || Volumes.isDirect(path)
+                // Berkas arsip (ZIP, JAR, APK) dibuka seperti folder
+                val archive = Archive.locate(path)
                 when {
+                    archive != null -> Archive.list(archive)
                     root && FileRepository.isProtectedStorage(path) -> FileRepository.listProtected(path)
                     root && !inStorage -> FileRepository.listRoot(path)
                     else -> FileRepository.listLocal(path)
@@ -410,6 +418,21 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         reloadAll()
     }
 
+    /** Tombol sinkron di bilah bawah: panel sebelah membuka folder yang sama dengan panel aktif. */
+    fun syncOtherPanel() {
+        val s = _state.value
+        if (!s.dual) return
+        val current = s.active
+        openFolder(1 - current, s.panels[current].path)
+        _state.update { it.copy(active = current) }
+    }
+
+    /** Tombol naik di bilah bawah: membuka folder induk. */
+    fun goUp() {
+        val s = _state.value
+        parentFolder(s.panels[s.active].path)?.let { openFolder(s.active, it) }
+    }
+
     /** Dipanggil tombol kembali. Mengembalikan false jika tidak ada yang bisa dilakukan. */
     fun goBack(): Boolean {
         val s = _state.value
@@ -475,6 +498,47 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                 },
             )
         }
+    }
+
+    /** Membalik pilihan: yang dipilih jadi tidak, yang tidak dipilih jadi dipilih. */
+    fun invertSelection(index: Int) {
+        _state.update { s ->
+            s.copy(
+                panels = s.panels.mapIndexed { i, p ->
+                    if (i != index) {
+                        p
+                    } else {
+                        val shown = visibleItems(p.items, s.search, s.showHidden, s.typeFilter)
+                        p.copy(selected = shown.map { it.path }.filterNot { it in p.selected }.toSet())
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * Pilih rentang: semua berkas di antara berkas pertama dan terakhir yang dipilih ikut dipilih.
+     * Mengembalikan false jika yang dipilih belum sampai dua.
+     */
+    fun selectRange(index: Int): Boolean {
+        val s = _state.value
+        val p = s.panels[index]
+        val shown = visibleItems(p.items, s.search, s.showHidden, s.typeFilter)
+        val marks = shown.indices.filter { shown[it].path in p.selected }
+        if (marks.size < 2) return false
+        val range = shown.subList(marks.first(), marks.last() + 1).map { it.path }.toSet()
+        updatePanel(index) { it.copy(selected = range) }
+        return true
+    }
+
+    /** Memilih semua berkas yang jenisnya sama dengan yang sedang dipilih (folder dengan folder, akhiran dengan akhiran). */
+    fun selectSameType(index: Int) {
+        val s = _state.value
+        val p = s.panels[index]
+        val shown = visibleItems(p.items, s.search, s.showHidden, s.typeFilter)
+        val kinds = shown.filter { it.path in p.selected }.map { if (it.isDir) "/" else it.extension }.toSet()
+        val same = shown.filter { (if (it.isDir) "/" else it.extension) in kinds }.map { it.path }.toSet()
+        updatePanel(index) { it.copy(selected = same) }
     }
 
     fun clearSelection() {
@@ -593,9 +657,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Menjalankan tindakan. Jika menyentuh folder sistem atau menghapus, minta konfirmasi dulu. */
-    fun requestAction(action: FileAction) {
+    fun requestAction(action: FileAction, confirm: Boolean = false) {
+        // Isi arsip hanya bisa dibaca dan disalin keluar
+        if (blockedByArchive(action)) {
+            _state.update { it.copy(dialog = null, message = text(R.string.msg_archive_readonly)) }
+            return
+        }
         val system = involvesSystem(action)
-        val needsConfirm = system || action is FileAction.Delete
+        val needsConfirm = system || confirm || action is FileAction.Delete
         if (needsConfirm) {
             _state.update { it.copy(dialog = AppDialog.Confirm(action, system)) }
         } else {
@@ -633,7 +702,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         if (!s.dual || paths.isEmpty()) return
         val dest = s.panels[1 - fromIndex].path
-        requestAction(FileAction.Paste(paths, move, dest))
+        // Seperti MT Manager, salin dan pindah ke panel sebelah ditanyakan dulu
+        requestAction(FileAction.Paste(paths, move, dest), confirm = true)
     }
 
     /** Menyalin atau memindahkan berkas yang dipilih langsung ke panel sebelahnya. */
@@ -648,6 +718,16 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         requestAction(FileAction.Paste(clip.paths, clip.move, dest))
     }
 
+    /** True jika tindakan ini mencoba mengubah isi arsip, yang tidak didukung. */
+    private fun blockedByArchive(action: FileAction): Boolean = when (action) {
+        is FileAction.Delete -> action.paths.any { Archive.inside(it) }
+        is FileAction.Paste -> Archive.locate(action.destDir) != null ||
+            (action.move && action.sources.any { Archive.inside(it) })
+        is FileAction.Rename -> Archive.inside(action.path)
+        is FileAction.NewFolder -> Archive.locate(action.parentDir) != null
+        is FileAction.NewFile -> Archive.locate(action.parentDir) != null
+    }
+
     private fun involvesSystem(action: FileAction): Boolean = when (action) {
         is FileAction.Delete -> action.paths.any { FileRepository.isSystemPath(it) }
         is FileAction.Paste -> FileRepository.isSystemPath(action.destDir) ||
@@ -660,10 +740,12 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     private fun execute(action: FileAction) {
         val root = _state.value.rootMode
         viewModelScope.launch {
+            pasted = emptySet()
             val (ok, message) = withContext(Dispatchers.IO) { runOperation(action, root) }
             _state.update { s ->
                 s.copy(
                     message = message,
+                    fresh = if (action is FileAction.Paste) pasted else s.fresh,
                     // Clip hanya dihapus jika yang ditempel memang isi clip, bukan transfer langsung ke panel sebelah
                     clip = if (action is FileAction.Paste && ok && s.clip?.paths == action.sources) null else s.clip,
                 )
@@ -672,6 +754,10 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             reloadAll()
         }
     }
+
+    // Alamat hasil salin atau pindah yang terakhir, diisi oleh runOperation
+    @Volatile
+    private var pasted: Set<String> = emptySet()
 
     private fun runOperation(action: FileAction, root: Boolean): Pair<Boolean, String> {
         return when (action) {
@@ -705,15 +791,28 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             is FileAction.Paste -> {
+                val made = HashSet<String>()
                 val results = action.sources.map { src ->
                     val intoItself = action.destDir == src || action.destDir.startsWith("$src/")
                     val sameSpot = action.move && FileRepository.parentOf(src) == action.destDir
+                    val inArchive = Archive.locate(src)?.takeIf { it.inner.isNotEmpty() }
                     when {
                         intoItself -> false
                         sameSpot -> true
-                        else -> FileRepository.transfer(src, action.destDir, action.move, root)
+                        // Berkas di dalam arsip dikeluarkan ke folder tujuan
+                        inArchive != null -> {
+                            val out = Archive.extract(inArchive, File(action.destDir))
+                            if (out != null) made.add(out.path)
+                            out != null
+                        }
+                        else -> {
+                            val target = FileRepository.transfer(src, action.destDir, action.move, root)
+                            if (target != null) made.add(target)
+                            target != null
+                        }
                     }
                 }
+                pasted = made
                 val good = results.count { it }
                 Pair(good == results.size, text(R.string.msg_paste_result, good, results.size))
             }
@@ -791,23 +890,114 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Mengekstrak ZIP ke folder baru dengan nama yang sama, di folder yang sama. */
-    fun extractZip(path: String) {
+    /**
+     * Mengekstrak arsip [path] ke folder [targetDir]. Jika [deleteSource] true, arsipnya dihapus
+     * setelah berhasil diekstrak.
+     */
+    fun extractZip(path: String, targetDir: String, deleteSource: Boolean) {
         val zip = File(path)
-        val dir = zip.parentFile ?: return
+        val target = File(targetDir)
+        _state.update { it.copy(dialog = null) }
+        if (Archive.locate(targetDir) != null) {
+            _state.update { it.copy(message = text(R.string.msg_archive_readonly)) }
+            return
+        }
         viewModelScope.launch {
             val message = withContext(Dispatchers.IO) {
-                val target = uniqueFile(dir, zip.nameWithoutExtension, "")
                 if (Archive.unzip(zip, target)) {
-                    text(R.string.msg_extracted, target.name)
+                    if (deleteSource) zip.delete()
+                    text(R.string.msg_extracted, target.name.ifEmpty { target.path })
                 } else {
-                    // Hasil setengah jadi dibuang, supaya tidak ada folder kosong yang membingungkan
-                    target.deleteRecursively()
                     text(R.string.msg_extract_failed)
                 }
             }
             _state.update { it.copy(message = message) }
             reloadAll()
+        }
+    }
+
+    // ---------- Peralatan berkas (menu tekan lama, "Peralatan") ----------
+
+    /** Menjalankan pekerjaan di latar belakang, lalu menampilkan pesannya dan memuat ulang panel. */
+    private fun runTool(work: () -> String) {
+        viewModelScope.launch {
+            val message = withContext(Dispatchers.IO) {
+                try {
+                    work()
+                } catch (e: Exception) {
+                    text(R.string.msg_failed)
+                }
+            }
+            _state.update { it.copy(message = message) }
+            clearSelection()
+            reloadAll()
+        }
+    }
+
+    fun splitFile(path: String, partMegabytes: Int) = runTool {
+        val count = FileTools.split(File(path), partMegabytes.coerceAtLeast(1) * 1024L * 1024L)
+        text(R.string.msg_split_done, count)
+    }
+
+    fun joinParts(path: String) = runTool {
+        val out = FileTools.join(File(path))
+        if (out == null) text(R.string.msg_join_no_first) else text(R.string.msg_join_done, out.name)
+    }
+
+    fun encryptFile(path: String, password: String) = runTool {
+        val src = File(path)
+        val dest = FileTools.uniqueFile(src.parentFile ?: File("/"), src.name + FileTools.ENCRYPTED_EXT)
+        FileTools.encrypt(src, dest, password.toCharArray())
+        text(R.string.msg_encrypt_done, dest.name)
+    }
+
+    fun decryptFile(path: String, password: String) = runTool {
+        val src = File(path)
+        val dest = FileTools.uniqueFile(src.parentFile ?: File("/"), src.name.removeSuffix(FileTools.ENCRYPTED_EXT))
+        if (FileTools.decrypt(src, dest, password.toCharArray())) {
+            text(R.string.msg_decrypt_done, dest.name)
+        } else {
+            text(R.string.msg_decrypt_wrong)
+        }
+    }
+
+    fun swapNames(first: String, second: String) = runTool {
+        text(if (FileTools.swapNames(File(first), File(second))) R.string.msg_swap_done else R.string.msg_failed)
+    }
+
+    /**
+     * Membuat tautan lunak ke [path]. Dalam mode dua panel tautan dibuat di folder panel sebelah,
+     * kalau tidak di folder yang sama. Penyimpanan internal biasanya menolak tautan, jadi root dicoba juga.
+     */
+    fun makeSymlink(path: String) {
+        val s = _state.value
+        val other = s.panels[1 - s.active].path
+        val here = FileRepository.parentOf(path)
+        val destDir = if (s.dual && other != here) other else here
+        val root = s.rootMode
+        runTool {
+            val name = FileRepository.nameOf(path).let { if (destDir == here) "$it-tautan" else it }
+            val link = FileRepository.join(destDir, name)
+            val direct = try {
+                android.system.Os.symlink(path, link)
+                true
+            } catch (e: Exception) {
+                false
+            }
+            val ok = direct ||
+                (root && RootShell.run("ln -s ${RootShell.quote(path)} ${RootShell.quote(link)}").exitCode == 0)
+            text(if (ok) R.string.msg_symlink_done else R.string.msg_symlink_failed)
+        }
+    }
+
+    /** Menulis daftar isi [paths] ke berkas teks di folder yang sedang dibuka. */
+    fun exportFileList(paths: List<String>) {
+        val s = _state.value
+        val dir = File(s.panels[s.active].path)
+        runTool {
+            val out = FileTools.uniqueFile(dir, "daftar-berkas.txt")
+            val count = FileTools.exportList(paths.map { File(it) }, out)
+            text(R.string.msg_export_done, count, out.name)
         }
     }
 

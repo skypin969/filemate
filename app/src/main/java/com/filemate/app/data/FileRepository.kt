@@ -160,21 +160,25 @@ object FileRepository {
         }
     }
 
-    /** Menyalin atau memindahkan [src] ke folder [destDir]. Nama dibuat unik jika sudah ada. */
-    fun transfer(src: String, destDir: String, move: Boolean, root: Boolean): Boolean {
+    /**
+     * Menyalin atau memindahkan [src] ke folder [destDir]. Nama dibuat unik jika sudah ada.
+     * Mengembalikan alamat hasilnya, atau null jika gagal.
+     */
+    fun transfer(src: String, destDir: String, move: Boolean, root: Boolean): String? {
         val target = uniqueTarget(destDir, nameOf(src), root)
         if (root) {
             val verb = if (move) "mv" else "cp -r"
-            return RootShell.run("$verb ${RootShell.quote(src)} ${RootShell.quote(target)}").exitCode == 0
+            val ok = RootShell.run("$verb ${RootShell.quote(src)} ${RootShell.quote(target)}").exitCode == 0
+            return if (ok) target else null
         }
         val source = File(src)
         val dest = File(target)
-        if (move && source.renameTo(dest)) return true
+        if (move && source.renameTo(dest)) return target
         return try {
             source.copyRecursively(dest, overwrite = false)
-            if (move) source.deleteRecursively() else true
+            if (move && !source.deleteRecursively()) null else target
         } catch (e: Exception) {
-            false
+            null
         }
     }
 

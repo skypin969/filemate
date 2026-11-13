@@ -73,6 +73,7 @@ fun FilePanel(
     onLongPress: (FileItem) -> Unit,
     style: ListStyle,
     modifier: Modifier = Modifier,
+    fresh: Set<String> = emptySet(),
 ) {
     Column(
         modifier = modifier
@@ -104,6 +105,7 @@ fun FilePanel(
                 FileRow(
                     item = item,
                     selected = item.path in panel.selected,
+                    fresh = item.path in fresh,
                     style = style,
                     // Di folder data aplikasi, folder bernama paket diberi ikon aplikasinya
                     packageFolders = isPackageParent(panel.path),
@@ -188,6 +190,7 @@ private fun InfoText(text: String) {
 private fun FileRow(
     item: FileItem,
     selected: Boolean,
+    fresh: Boolean,
     style: ListStyle,
     packageFolders: Boolean,
     onClick: () -> Unit,
@@ -214,7 +217,8 @@ private fun FileRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.name,
-                color = Ink,
+                // Berkas yang baru disalin atau dipindah diberi warna hijau, seperti MT Manager
+                color = if (fresh) FreshGreen else Ink,
                 fontWeight = if (recent) FontWeight.Bold else FontWeight.Normal,
                 fontSize = (15 * style.scale).sp,
                 lineHeight = (18 * style.scale).sp,
@@ -363,6 +367,12 @@ val TEXT_EXT = setOf(
     "TXT", "MD", "XML", "JSON", "HTML", "HTM", "CSS", "JS", "SH", "PROP", "CONF", "CFG", "INI", "LOG", "RC",
     "JAVA", "KT", "KTS", "SMALI", "YML", "YAML", "CSV", "SVG", "PY", "C", "H", "CPP", "GRADLE", "PROPERTIES", "BAT",
 )
+
+/** Akhiran berkas font yang dibuka dengan penampil font. */
+val FONT_EXT = setOf("TTF", "OTF", "TTC")
+
+/** Warna nama berkas yang baru disalin atau dipindah. */
+private val FreshGreen = Color(0xFF2E7D32)
 
 private val ARCHIVE_EXT = setOf("ZIP", "RAR", "7Z", "TAR", "GZ", "TGZ", "XZ", "BZ2", "JAR", "APKS", "XAPK")
 

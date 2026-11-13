@@ -67,6 +67,7 @@ fun FilemateApp() {
             ToolKind.LAYOUT -> LayoutViewerScreen(close)
             ToolKind.COLOR -> ColorPickerScreen(close)
             ToolKind.CLASSES -> ClassAnalysisScreen(openTool.second.orEmpty(), close)
+            ToolKind.FONT -> FontPreviewScreen(openTool.second.orEmpty(), close)
             // FTP, HTTP, dan Transfer LAN berupa dialog di layar utama, bukan layar penuh
             else -> tool = null
         }

@@ -1,6 +1,13 @@
 package com.filemate.app.ui
 
 import android.app.Activity
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.FlipToBack
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.SyncAlt
+import com.filemate.app.data.Archive
 import androidx.compose.material.icons.filled.Usb
 import com.filemate.app.data.Volumes
 import androidx.compose.material.icons.filled.Person
@@ -207,6 +214,13 @@ fun MainScreen(
     val jarDone = stringResource(R.string.jar_done)
     val jarFailed = stringResource(R.string.jar_failed)
     val invalidPath = stringResource(R.string.msg_invalid_path)
+    // Berkas yang sedang dibukakan dialog "Peralatan", dan alat yang masih menunggu isian (ukuran atau kata sandi)
+    var toolTargets by remember { mutableStateOf<List<FileItem>?>(null) }
+    var pendingTool by remember { mutableStateOf<Pair<FileTool, FileItem>?>(null) }
+    val openFailed = stringResource(R.string.msg_cannot_open)
+    val rangeHint = stringResource(R.string.msg_range_hint)
+    val shortcutAsked = stringResource(R.string.msg_shortcut_asked)
+    val shortcutFailed = stringResource(R.string.msg_shortcut_failed)
     val notReadyName = stringResource(R.string.msg_invalid_name)
 
     // Tombol kembali: tutup menu, lalu tutup pencarian/pilihan, lalu naik satu folder, lalu keluar
@@ -220,6 +234,15 @@ fun MainScreen(
     // Saat kembali dari editor atau pengaturan, isi panel dimuat ulang (ukuran dan tanggal berkas bisa berubah)
     LaunchedEffect(Unit) {
         vm.reloadAll()
+    }
+
+    // Pintasan folder di layar utama HP: buka folder yang diminta
+    val pendingPath = PendingOpen.path
+    LaunchedEffect(pendingPath) {
+        if (pendingPath != null) {
+            PendingOpen.path = null
+            vm.openFolder(vm.state.value.active, pendingPath)
+        }
     }
 
     LaunchedEffect(state.message) {
@@ -256,33 +279,57 @@ fun MainScreen(
         stringResource(if (writable) R.string.top_rw else R.string.top_ro),
     )
 
+    // Membuka satu berkas (bukan folder) dengan cara yang cocok untuk jenisnya
+    fun openFileItem(index: Int, item: FileItem) {
+        vm.setActive(index)
+        when {
+            item.isApk -> vm.openApk(item.path)
+            // ZIP yang dibuka dari dalam arsip lain juga ditampilkan seperti folder
+            item.extension == "ZIP" -> vm.openFolder(index, item.path)
+            // Berkas font langsung masuk penampil font, seperti MT Manager
+            item.extension in FONT_EXT -> onOpenTool(ToolKind.FONT, item.path)
+            // Berkas MD dan HTML dibuka sebagai pratinjau jika pengaturannya dinyalakan
+            item.extension == "MD" && mdPreview -> onOpenPreview(PreviewTarget(item.path, markdown = true))
+            (item.extension == "HTML" || item.extension == "HTM") && htmlPreview ->
+                onOpenPreview(PreviewTarget(item.path, markdown = false))
+            // Berkas teks langsung dibuka di editor. Jenis lain memunculkan pilihan "Buka dengan".
+            item.extension in TEXT_EXT -> onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
+            else -> openWithTarget = item
+        }
+    }
+
+    // Berkas di dalam arsip dikeluarkan dulu ke folder sementara, lalu dibuka seperti berkas biasa
+    // [chooser] true berarti dialog "Buka dengan" yang ditampilkan, bukan cara buka bawaan
+    fun openArchiveEntry(index: Int, item: FileItem, chooser: Boolean = false) {
+        scope.launch {
+            val temp = withContext(Dispatchers.IO) {
+                Archive.locate(item.path)?.let { Archive.extractToTemp(it, context.cacheDir) }
+            }
+            if (temp == null || !temp.isFile) {
+                vm.notify(openFailed)
+            } else {
+                val copy = FileItem(
+                    name = temp.name,
+                    path = temp.path,
+                    isDir = false,
+                    isLink = false,
+                    size = temp.length(),
+                    modified = temp.lastModified(),
+                )
+                if (chooser) openWithTarget = copy else openFileItem(index, copy)
+            }
+        }
+    }
+
     fun tapItem(index: Int, item: FileItem) {
         val panel = state.panels[index]
         when {
             panel.selected.isNotEmpty() -> vm.toggleSelect(index, item.path)
             item.isDir || (item.isLink && !item.isApk) -> vm.openFolder(index, item.path)
-            item.isApk -> {
-                vm.setActive(index)
-                vm.openApk(item.path)
-            }
-            // Berkas teks langsung dibuka di editor. Jenis lain memunculkan pilihan "Buka dengan", seperti NP Manager.
-            // Berkas MD dan HTML dibuka sebagai pratinjau jika pengaturannya dinyalakan
-            item.extension == "MD" && mdPreview -> {
-                vm.setActive(index)
-                onOpenPreview(PreviewTarget(item.path, markdown = true))
-            }
-            (item.extension == "HTML" || item.extension == "HTM") && htmlPreview -> {
-                vm.setActive(index)
-                onOpenPreview(PreviewTarget(item.path, markdown = false))
-            }
-            item.extension in TEXT_EXT -> {
-                vm.setActive(index)
-                onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode))
-            }
-            else -> {
-                vm.setActive(index)
-                openWithTarget = item
-            }
+            Archive.inside(item.path) -> openArchiveEntry(index, item)
+            // ZIP dibuka seperti folder, seperti MT Manager
+            item.extension == "ZIP" -> vm.openFolder(index, item.path)
+            else -> openFileItem(index, item)
         }
     }
 
@@ -377,6 +424,9 @@ fun MainScreen(
                     onBookmark = { vm.addBookmark(active.path) },
                     onSettings = onOpenSettings,
                     onExit = { (context as? Activity)?.finish() },
+                    onRefresh = { vm.reloadAll() },
+                    canSwap = state.dual,
+                    onSwap = { vm.swapPanels() },
                 )
 
                 // Garis tipis di bawah bilah atas: bagian yang gelap menandai panel yang sedang aktif
@@ -442,6 +492,7 @@ fun MainScreen(
                             onTap = { item -> tapItem(index, item) },
                             onIconTap = { item -> vm.toggleSelect(index, item.path) },
                             onLongPress = { item -> menuTarget = index to item },
+                            fresh = state.fresh,
                             style = listStyle,
                             modifier = Modifier.weight(1f),
                         )
@@ -453,17 +504,30 @@ fun MainScreen(
                     onPaste = { vm.pasteHere() },
                 )
 
-                BottomBar(
-                    canBack = active.back.isNotEmpty(),
-                    canForward = active.forward.isNotEmpty(),
-                    canSwap = state.dual,
-                    extraBottom = bottomMargin,
-                    onBack = { vm.historyBack(state.active) },
-                    onForward = { vm.historyForward(state.active) },
-                    onAdd = { vm.showDialog(AppDialog.NewFolder(active.path)) },
-                    onSwap = { vm.swapPanels() },
-                    onRefresh = { vm.reloadAll() },
-                )
+                if (active.selected.isNotEmpty()) {
+                    // Saat ada berkas ditandai, bilah bawah berganti jadi tombol pilihan, seperti MT Manager
+                    SelectBottomBar(
+                        extraBottom = bottomMargin,
+                        onSelectAll = { vm.selectAll(state.active) },
+                        onInvert = { vm.invertSelection(state.active) },
+                        onCancel = { vm.clearSelection() },
+                        onRange = { if (!vm.selectRange(state.active)) vm.notify(rangeHint) },
+                        onSameType = { vm.selectSameType(state.active) },
+                    )
+                } else {
+                    BottomBar(
+                        canBack = active.back.isNotEmpty(),
+                        canForward = active.forward.isNotEmpty(),
+                        canSync = state.dual,
+                        canUp = vm.parentFolder(active.path) != null,
+                        extraBottom = bottomMargin,
+                        onBack = { vm.historyBack(state.active) },
+                        onForward = { vm.historyForward(state.active) },
+                        onAdd = { vm.showDialog(AppDialog.NewFolder(active.path)) },
+                        onSync = { vm.syncOtherPanel() },
+                        onUp = { vm.goUp() },
+                    )
+                }
             }
 
             SnackbarHost(
@@ -482,9 +546,12 @@ fun MainScreen(
         val panel = state.panels[index]
         val picked = panel.items.filter { it.path in panel.selected }.map { it.path }
         val targets = if (item.path in panel.selected && picked.size > 1) picked else listOf(item.path)
+        val targetItems = panel.items.filter { it.path in targets }.ifEmpty { listOf(item) }
         ItemMenu(
             item = item,
             multi = targets.size > 1,
+            // Di dalam arsip hanya bisa menyalin keluar
+            inArchive = Archive.inside(item.path),
             // Panel kiri menyalin ke kanan, panel kanan menyalin ke kiri
             towardRight = index == 0,
             dual = state.dual,
@@ -526,20 +593,24 @@ fun MainScreen(
             onAttributes = { closeMenu { vm.showDialog(AppDialog.Attributes(item)) } },
             onSend = { closeMenu { vm.notify(notReady) } },
             onShare = { closeMenu { shareFile(context, item) } },
-            onOpenWith = { closeMenu { openWithTarget = item } },
+            onOpenWith = {
+                closeMenu {
+                    if (Archive.inside(item.path)) openArchiveEntry(index, item, chooser = true) else openWithTarget = item
+                }
+            },
             onEditHex = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode)) } },
             // "Alat": untuk APK membuka alat APK. Jenis lain belum punya alat.
             onTools = {
                 closeMenu {
                     vm.setActive(index)
-                    if (item.isApk) vm.openApk(item.path) else vm.notify(notReady)
+                    toolTargets = targetItems
                 }
             },
             onEditText = { closeMenu { onOpenEditor(EditorTarget(item.path, hex = false, root = state.rootMode)) } },
             onBookmark = {
                 closeMenu { vm.addBookmark(if (item.isDir) item.path else FileRepository.parentOf(item.path)) }
             },
-            onExtract = { closeMenu { vm.setActive(index); vm.extractZip(item.path) } },
+            onExtract = { closeMenu { vm.setActive(index); vm.showDialog(AppDialog.Extract(item.path)) } },
             onRunScript = {
                 closeMenu {
                     onOpenTerminal(
@@ -572,8 +643,13 @@ fun MainScreen(
                         OpenMode.HEX ->
                             onOpenEditor(EditorTarget(item.path, hex = true, root = state.rootMode))
                         OpenMode.APK_INFO -> vm.openApk(item.path)
+                        // Penampil arsip: isi arsip dibuka di panel seperti folder
                         OpenMode.ARCHIVE ->
-                            if (item.extension == "ZIP") vm.extractZip(item.path) else vm.notify(notReady)
+                            if (item.extension.lowercase() in Archive.BROWSABLE) {
+                                vm.openFolder(state.active, item.path)
+                            } else {
+                                vm.notify(notReady)
+                            }
                         OpenMode.SCRIPT -> onOpenTerminal(
                             TerminalTarget(
                                 cwd = FileRepository.parentOf(item.path),
@@ -584,7 +660,7 @@ fun MainScreen(
                         OpenMode.IMAGE -> openFileAs(context, item, "image/*")
                         OpenMode.MUSIC -> openFileAs(context, item, "audio/*")
                         OpenMode.PDF -> openFileAs(context, item, "application/pdf")
-                        OpenMode.FONT -> openFileAs(context, item, "font/*")
+                        OpenMode.FONT -> onOpenTool(ToolKind.FONT, item.path)
                         OpenMode.DEX -> onOpenTool(ToolKind.CLASSES, item.path)
                         // Fungsi Jar: mengubah JAR menjadi DEX di folder kerja Filemate
                         OpenMode.JAR -> {
@@ -694,6 +770,47 @@ fun MainScreen(
         )
     }
 
+    // Dialog "Peralatan" dari menu tekan lama
+    toolTargets?.let { targets ->
+        FileToolsDialog(
+            targets = targets,
+            onDismiss = { toolTargets = null },
+            onPick = { tool ->
+                toolTargets = null
+                val first = targets.first()
+                when (tool) {
+                    FileTool.APK -> vm.openApk(first.path)
+                    FileTool.SPLIT, FileTool.ENCRYPT, FileTool.DECRYPT -> pendingTool = tool to first
+                    FileTool.JOIN -> vm.joinParts(first.path)
+                    FileTool.SWAP -> vm.swapNames(targets[0].path, targets[1].path)
+                    FileTool.SYMLINK -> vm.makeSymlink(first.path)
+                    FileTool.SHORTCUT -> vm.notify(if (pinShortcut(context, first)) shortcutAsked else shortcutFailed)
+                    FileTool.EXPORT -> vm.exportFileList(targets.map { it.path })
+                }
+            },
+        )
+    }
+
+    // Isian lanjutan untuk alat yang butuh ukuran potongan atau kata sandi
+    pendingTool?.let { (tool, item) ->
+        val split = tool == FileTool.SPLIT
+        InputDialog(
+            title = stringResource(tool.label),
+            label = stringResource(if (split) R.string.ftool_split_hint else R.string.ftool_password_hint),
+            initial = if (split) "10" else "",
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                pendingTool = null
+                when (tool) {
+                    FileTool.SPLIT -> vm.splitFile(item.path, typed.toIntOrNull()?.coerceIn(1, 4096) ?: 10)
+                    FileTool.ENCRYPT -> vm.encryptFile(item.path, typed)
+                    else -> vm.decryptFile(item.path, typed)
+                }
+            },
+            onDismiss = { pendingTool = null },
+        )
+    }
+
     if (sortOpen) {
         SortDialog(
             current = state.sort,
@@ -758,9 +875,20 @@ fun MainScreen(
                         vm.installTarget()?.let { installWithSystem(context, it) }
                     }
                 },
+                onBrowse = {
+                    vm.dismissApk()
+                    vm.openFolder(state.active, info.path)
+                },
                 onDismiss = { vm.dismissApk() },
             )
         }
+
+        is AppDialog.Extract -> ExtractDialog(
+            path = dialog.path,
+            otherPanelDir = if (state.dual) state.panels[1 - state.active].path else null,
+            onExtract = { target, deleteSource -> vm.extractZip(dialog.path, target, deleteSource) },
+            onDismiss = { vm.dismissDialog() },
+        )
 
         is AppDialog.Attributes -> AttributesDialog(
             item = dialog.item,
@@ -802,6 +930,9 @@ private fun TopBar(
     onBookmark: () -> Unit,
     onSettings: () -> Unit,
     onExit: () -> Unit,
+    onRefresh: () -> Unit,
+    canSwap: Boolean,
+    onSwap: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -880,6 +1011,11 @@ private fun TopBar(
                 onDismissRequest = { menuOpen = false },
                 containerColor = Color.White,
             ) {
+                // Urutan mengikuti menu titik tiga MT Manager
+                OverflowItem(stringResource(R.string.bar_refresh), Icons.Filled.Refresh) {
+                    menuOpen = false
+                    onRefresh()
+                }
                 OverflowItem(stringResource(R.string.menu_search), Icons.Filled.Search) {
                     menuOpen = false
                     onSearch()
@@ -887,6 +1023,10 @@ private fun TopBar(
                 OverflowItem(stringResource(R.string.menu_select_all), Icons.Filled.SelectAll) {
                     menuOpen = false
                     onSelectAll()
+                }
+                OverflowItem(stringResource(R.string.menu_filter), Icons.Filled.FilterList) {
+                    menuOpen = false
+                    onFilter()
                 }
                 OverflowItem(stringResource(R.string.menu_sort), Icons.Filled.Sort) {
                     menuOpen = false
@@ -905,10 +1045,6 @@ private fun TopBar(
                     menuOpen = false
                     onToggleHidden()
                 }
-                OverflowItem(stringResource(R.string.menu_filter), Icons.Filled.FilterList) {
-                    menuOpen = false
-                    onFilter()
-                }
                 OverflowItem(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark) {
                     menuOpen = false
                     onBookmark()
@@ -916,6 +1052,12 @@ private fun TopBar(
                 OverflowItem(stringResource(R.string.menu_set_home), Icons.Filled.Home) {
                     menuOpen = false
                     onHome()
+                }
+                if (canSwap) {
+                    OverflowItem(stringResource(R.string.menu_swap_panels), Icons.Filled.SwapHoriz) {
+                        menuOpen = false
+                        onSwap()
+                    }
                 }
                 OverflowItem(stringResource(R.string.drawer_settings), Icons.Filled.Settings) {
                     menuOpen = false
@@ -1075,19 +1217,54 @@ private fun PasteBar(count: Int?, onPaste: () -> Unit) {
     }
 }
 
-/** Bilah bawah berisi lima ikon abu-abu tanpa tulisan: kembali, maju, tambah folder, tukar panel, muat ulang. */
+/**
+ * Bilah bawah berisi lima ikon abu-abu tanpa tulisan, susunannya seperti MT Manager:
+ * kembali, maju, tambah, samakan panel sebelah, dan naik satu folder.
+ */
 @Composable
 private fun BottomBar(
     canBack: Boolean,
     canForward: Boolean,
-    canSwap: Boolean,
+    canSync: Boolean,
+    canUp: Boolean,
     extraBottom: Int,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onAdd: () -> Unit,
-    onSwap: () -> Unit,
-    onRefresh: () -> Unit,
+    onSync: () -> Unit,
+    onUp: () -> Unit,
 ) {
+    BarFrame(extraBottom) {
+        BarButton(Icons.Filled.ArrowBack, stringResource(R.string.bar_back), canBack, onBack)
+        BarButton(Icons.Filled.ArrowForward, stringResource(R.string.bar_forward), canForward, onForward)
+        BarButton(Icons.Filled.Add, stringResource(R.string.bar_add), true, onAdd)
+        BarButton(Icons.Filled.SyncAlt, stringResource(R.string.bar_sync), canSync, onSync)
+        BarButton(Icons.Filled.ArrowUpward, stringResource(R.string.bar_up), canUp, onUp)
+    }
+}
+
+/** Bilah bawah saat ada berkas ditandai: pilih semua, balik pilihan, batal, pilih rentang, pilih sejenis. */
+@Composable
+private fun SelectBottomBar(
+    extraBottom: Int,
+    onSelectAll: () -> Unit,
+    onInvert: () -> Unit,
+    onCancel: () -> Unit,
+    onRange: () -> Unit,
+    onSameType: () -> Unit,
+) {
+    BarFrame(extraBottom) {
+        BarButton(Icons.Filled.SelectAll, stringResource(R.string.menu_select_all), true, onSelectAll)
+        BarButton(Icons.Filled.FlipToBack, stringResource(R.string.bar_invert), true, onInvert)
+        BarButton(Icons.Filled.Close, stringResource(R.string.btn_cancel), true, onCancel)
+        BarButton(Icons.Filled.UnfoldMore, stringResource(R.string.bar_range), true, onRange)
+        BarButton(Icons.Filled.Category, stringResource(R.string.bar_same_type), true, onSameType)
+    }
+}
+
+/** Bingkai bilah bawah: garis tipis di atas, lima tombol rata, dan jarak tambahan dari pengaturan. */
+@Composable
+private fun BarFrame(extraBottom: Int, buttons: @Composable RowScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1101,13 +1278,8 @@ private fun BottomBar(
                 .height(52.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BarButton(Icons.Filled.ArrowBack, stringResource(R.string.bar_back), canBack, onBack)
-            BarButton(Icons.Filled.ArrowForward, stringResource(R.string.bar_forward), canForward, onForward)
-            BarButton(Icons.Filled.Add, stringResource(R.string.bar_add), true, onAdd)
-            BarButton(Icons.Filled.SwapHoriz, stringResource(R.string.bar_swap), canSwap, onSwap)
-            BarButton(Icons.Filled.Refresh, stringResource(R.string.bar_refresh), true, onRefresh)
-        }
+            content = buttons,
+        )
         // Jarak tambahan dari pengaturan "Ukuran margin bawah bilah alat bawah"
         if (extraBottom > 0) Spacer(Modifier.height(extraBottom.dp))
     }
@@ -1145,6 +1317,7 @@ private class MenuEntry(
 private fun ItemMenu(
     item: FileItem,
     multi: Boolean,
+    inArchive: Boolean,
     towardRight: Boolean,
     dual: Boolean,
     onDismiss: () -> Unit,
@@ -1172,11 +1345,15 @@ private fun ItemMenu(
     val copyLabel = if (!dual) copyText else if (towardRight) "$copyText ->" else "<- $copyText"
     val moveLabel = if (!dual) moveText else if (towardRight) "$moveText ->" else "<- $moveText"
 
-    // Beberapa berkas dipilih: hanya pilihan yang bisa berlaku untuk semuanya sekaligus
-    val entries = if (multi) listOf(
+    // Di dalam arsip: hanya menyalin keluar. Beberapa berkas dipilih: hanya pilihan yang berlaku untuk semuanya.
+    val entries = if (inArchive) listOfNotNull(
+        MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
+        if (isFile && !multi) MenuEntry(stringResource(R.string.menu_open_with), Icons.Filled.OpenInNew, Ink, onOpenWith) else null,
+    ) else if (multi) listOf(
         MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
         MenuEntry(moveLabel, Icons.Filled.ContentCut, Ink, onMoveOther),
         MenuEntry(stringResource(R.string.btn_delete), Icons.Filled.Delete, Danger, onDelete),
+        MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
         MenuEntry(stringResource(R.string.menu_compress), Icons.Filled.Archive, Ink, onCompress),
     ) else listOfNotNull(
         MenuEntry(copyLabel, Icons.Filled.ContentCopy, Ink, onCopyOther),
@@ -1189,7 +1366,7 @@ private fun ItemMenu(
         if (isFile) MenuEntry(stringResource(R.string.menu_share), Icons.Filled.Share, Ink, onShare) else null,
         if (isFile) MenuEntry(stringResource(R.string.menu_open_with), Icons.Filled.OpenInNew, Ink, onOpenWith) else null,
         if (isFile) MenuEntry(stringResource(R.string.menu_edit_hex), Icons.Filled.Code, Ink, onEditHex) else null,
-        if (isFile) MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools) else null,
+        MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
         if (isFile) MenuEntry(stringResource(R.string.menu_edit_text), Icons.Filled.Description, Ink, onEditText) else null,
         MenuEntry(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, Ink, onBookmark),
         // Untuk ZIP, pilihan terakhir adalah mengekstrak, seperti NP Manager
