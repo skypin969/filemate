@@ -408,4 +408,6 @@
     <string name="jar_working">Mengubah JAR menjadi DEX...</string>
     <string name="jar_done">DEX disimpan di: %s</string>
     <string name="jar_failed">JAR ini tidak bisa diubah menjadi DEX.</string>
+    <string name="msg_volume_connected">%1$s terhubung</string>
+    <string name="msg_volume_removed">%1$s dilepas</string>
 </resources>

@@ -1,6 +1,8 @@
 package com.filemate.app.ui
 
 import android.app.Activity
+import androidx.compose.material.icons.filled.Usb
+import com.filemate.app.data.Volumes
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import android.widget.Toast
@@ -236,7 +238,14 @@ fun MainScreen(
     // Baris keterangan kecil di bawah jalur: jumlah folder, jumlah berkas, pemakaian penyimpanan, dan izin tulis
     val folderCount = active.items.count { it.isDir }
     val fileCount = active.items.size - folderCount
-    val storage = remember(active.path, active.items) { storageBytes(FileRepository.STORAGE_ROOT) }
+    // Di flashdisk atau kartu SD, yang ditampilkan pemakaian penyimpanan itu, bukan penyimpanan internal
+    val storage = remember(active.path, active.items) {
+        storageBytes(Volumes.find(active.path)?.takeIf { !it.needsRoot }?.path ?: FileRepository.STORAGE_ROOT)
+    }
+    // Daftar flashdisk diperiksa ulang setiap menu samping dibuka
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen) vm.refreshVolumes()
+    }
     val writable = remember(active.path, state.rootMode) { File(active.path).canWrite() }
     val topInfo = stringResource(
         R.string.top_info,
@@ -1382,6 +1391,7 @@ private fun DrawerSheet(
 ) {
     val storageLabel = stringResource(R.string.title_storage)
     val context = LocalContext.current
+    val volumes by Volumes.list.collectAsState()
     var localOpen by remember { mutableStateOf(true) }
     var bookmarkOpen by remember { mutableStateOf(false) }
     var toolsOpen by remember { mutableStateOf(true) }
@@ -1464,6 +1474,15 @@ private fun DrawerSheet(
                     path = FileRepository.STORAGE_ROOT,
                     onClick = { onGoto(FileRepository.STORAGE_ROOT) },
                 )
+                // Flashdisk OTG dan kartu SD yang sedang terpasang
+                volumes.forEach { volume ->
+                    StorageRow(
+                        title = volume.label,
+                        icon = Icons.Filled.Usb,
+                        path = volume.path,
+                        onClick = { onGoto(volume.path) },
+                    )
+                }
             }
 
             DrawerSection(stringResource(R.string.drawer_bookmarks), bookmarkOpen) { bookmarkOpen = !bookmarkOpen }
@@ -1655,6 +1674,24 @@ private fun StorageRow(
     onClick: () -> Unit,
 ) {
     val (total, free) = remember(path) { storageBytes(path) }
+    // Flashdisk yang hanya terbaca lewat root tidak bisa diukur dari sini, jadi cukup tampilkan jalurnya
+    if (total <= 0L) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DrawerIcon(icon)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, color = Ink, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = path, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        return
+    }
     val used = (total - free).coerceAtLeast(0L)
     val fraction = if (total > 0) used.toFloat() / total.toFloat() else 0f
 

@@ -408,4 +408,6 @@
     <string name="jar_working">Converting JAR to DEX...</string>
     <string name="jar_done">DEX saved to: %s</string>
     <string name="jar_failed">This JAR could not be converted to DEX.</string>
+    <string name="msg_volume_connected">%1$s connected</string>
+    <string name="msg_volume_removed">%1$s removed</string>
 </resources>

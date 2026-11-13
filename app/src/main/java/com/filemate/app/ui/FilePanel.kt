@@ -51,6 +51,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.filemate.app.R
 import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
+import com.filemate.app.data.Volumes
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -125,7 +126,8 @@ fun FilePanel(
 fun folderTitle(path: String, storageLabel: String): String = when (path) {
     FileRepository.STORAGE_ROOT -> storageLabel
     "/" -> "/"
-    else -> FileRepository.nameOf(path).ifEmpty { "/" }
+    // Folder paling atas flashdisk atau kartu SD diberi namanya, bukan kode seperti "1A2B-3C4D"
+    else -> Volumes.labelFor(path) ?: FileRepository.nameOf(path).ifEmpty { "/" }
 }
 
 /**

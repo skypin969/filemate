@@ -1,5 +1,13 @@
 package com.filemate.app.ui
 
+import kotlinx.coroutines.delay
+import com.filemate.app.data.Volumes
+import androidx.core.content.ContextCompat
+import android.hardware.usb.UsbManager
+import android.content.IntentFilter
+import android.content.Intent
+import android.content.Context
+import android.content.BroadcastReceiver
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -139,6 +147,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         // Akses root dicoba otomatis setiap aplikasi dibuka. Jika izin sudah diberikan di aplikasi
         // pengelola root (Magisk, KernelSU), mode root langsung aktif tanpa tombol.
         setRootMode(true, quiet = true)
+        watchVolumes(app)
         // Sakelar "Mulai layanan secara otomatis saat aplikasi dibuka" di dialog APK MCP
         if (prefs.getBoolean(AppPrefs.KEY_MCP_AUTO, false)) {
             try {
@@ -148,6 +157,94 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    // ---------- Flashdisk OTG dan kartu SD ----------
+
+    private val volumeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshVolumes(announce = true)
+            // Saat flashdisk baru dicolok, Android butuh waktu sebentar sebelum isinya bisa dibaca
+            viewModelScope.launch {
+                delay(2500)
+                refreshVolumes(announce = true)
+            }
+        }
+    }
+
+    /** Memantau flashdisk yang dicolok atau dilepas selama aplikasi terbuka. */
+    private fun watchVolumes(app: Application) {
+        val media = IntentFilter().apply {
+            addAction(Intent.ACTION_MEDIA_MOUNTED)
+            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+            addAction(Intent.ACTION_MEDIA_REMOVED)
+            addAction(Intent.ACTION_MEDIA_BAD_REMOVAL)
+            addAction(Intent.ACTION_MEDIA_EJECT)
+            addDataScheme("file")
+        }
+        val usb = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        try {
+            ContextCompat.registerReceiver(app, volumeReceiver, media, ContextCompat.RECEIVER_EXPORTED)
+            ContextCompat.registerReceiver(app, volumeReceiver, usb, ContextCompat.RECEIVER_EXPORTED)
+        } catch (e: Exception) {
+            // Tanpa pemantau, daftar tetap diperbarui setiap menu samping dibuka
+        }
+        refreshVolumes()
+    }
+
+    override fun onCleared() {
+        try {
+            getApplication<Application>().unregisterReceiver(volumeReceiver)
+        } catch (e: Exception) {
+            // Belum terdaftar
+        }
+        super.onCleared()
+    }
+
+    /** Mencari ulang flashdisk yang terpasang. [announce] menampilkan pesan saat ada yang dicolok atau dilepas. */
+    fun refreshVolumes(announce: Boolean = false) {
+        viewModelScope.launch {
+            val root = _state.value.rootMode
+            val found = withContext(Dispatchers.IO) { Volumes.scan(getApplication<Application>(), root) }
+            val before = Volumes.list.value
+            if (found == before) return@launch
+            Volumes.update(found)
+            val added = found.filter { v -> before.none { it.path == v.path } }
+            val removed = before.filter { v -> found.none { it.path == v.path } }
+            // Panel yang sedang membuka flashdisk yang dilepas dikembalikan ke penyimpanan internal
+            val gone = { path: String -> removed.any { path == it.path || path.startsWith(it.path + "/") } }
+            if (_state.value.panels.any { gone(it.path) }) {
+                _state.update { s ->
+                    s.copy(
+                        panels = s.panels.map { p ->
+                            if (!gone(p.path)) p.copy(back = p.back.filterNot(gone), forward = p.forward.filterNot(gone))
+                            else p.copy(
+                                path = FileRepository.STORAGE_ROOT,
+                                selected = emptySet(),
+                                back = p.back.filterNot(gone),
+                                forward = p.forward.filterNot(gone),
+                            )
+                        },
+                    )
+                }
+                reloadAll()
+            }
+            if (announce) {
+                val message = when {
+                    added.isNotEmpty() -> text(R.string.msg_volume_connected, added.first().label)
+                    removed.isNotEmpty() -> text(R.string.msg_volume_removed, removed.first().label)
+                    else -> null
+                }
+                if (message != null) _state.update { it.copy(message = message) }
+            }
+        }
+    }
+
+    /** True jika [path] bisa dibuka tanpa root: penyimpanan internal, flashdisk, atau kartu SD. */
+    private fun isUserStorage(path: String): Boolean =
+        path.startsWith(FileRepository.STORAGE_ROOT) || Volumes.isDirect(path)
 
     /** Folder awal: folder beranda pilihan user jika masih bisa dibuka, kalau tidak penyimpanan internal. */
     private fun startFolder(): String {
@@ -207,7 +304,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             val result = withContext(Dispatchers.IO) {
                 // Penyimpanan internal dibaca langsung karena lebih cepat. Root dipakai untuk folder lain,
                 // dan untuk Android/data serta Android/obb yang disembunyikan Android dari aplikasi biasa.
-                val inStorage = path.startsWith("/storage/emulated")
+                // Flashdisk dan kartu SD di /storage juga dibaca langsung.
+                val inStorage = path.startsWith("/storage/emulated") || Volumes.isDirect(path)
                 when {
                     root && FileRepository.isProtectedStorage(path) -> FileRepository.listProtected(path)
                     root && !inStorage -> FileRepository.listRoot(path)
@@ -333,7 +431,12 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         if (path == "/" || path.isEmpty()) return null
         val parent = FileRepository.parentOf(path)
         // Tanpa root, naik paling jauh sampai /storage/emulated (isinya folder "0"), seperti NP Manager
-        if (!_state.value.rootMode && !parent.startsWith("/storage/emulated")) return null
+        if (!_state.value.rootMode) {
+            // Di flashdisk atau kartu SD, batasnya folder paling atas penyimpanan itu
+            val volume = Volumes.find(path)
+            if (volume != null) return if (path == volume.path) null else parent
+            if (!parent.startsWith("/storage/emulated")) return null
+        }
         return parent
     }
 
@@ -421,14 +524,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                     rootMode = false,
                     message = text(R.string.msg_root_off),
                     panels = s.panels.map { p ->
-                        val inStorage = p.path.startsWith(FileRepository.STORAGE_ROOT)
+                        val inStorage = isUserStorage(p.path)
                         p.copy(
                             path = if (inStorage) p.path else FileRepository.STORAGE_ROOT,
                             selected = if (inStorage) p.selected else emptySet(),
                             // Riwayat yang berisi folder root (misalnya / atau /storage) dibuang,
                             // karena folder itu tidak bisa dibuka tanpa akses root
-                            back = p.back.filter { it.startsWith(FileRepository.STORAGE_ROOT) },
-                            forward = p.forward.filter { it.startsWith(FileRepository.STORAGE_ROOT) },
+                            back = p.back.filter { isUserStorage(it) },
+                            forward = p.forward.filter { isUserStorage(it) },
                         )
                     },
                 )
@@ -441,6 +544,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
             if (granted) {
                 _state.update { it.copy(rootMode = true, message = if (quiet) null else text(R.string.msg_root_on)) }
                 reloadAll()
+                // Dengan root, flashdisk yang tidak ditampilkan ke aplikasi biasa ikut dicari
+                refreshVolumes()
             } else if (!quiet) {
                 _state.update { it.copy(message = text(R.string.msg_root_denied)) }
             }
