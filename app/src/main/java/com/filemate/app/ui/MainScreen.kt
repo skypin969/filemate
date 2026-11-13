@@ -158,6 +158,7 @@ fun MainScreen(
     // Berkas yang sedang dipilihkan cara bukanya lewat dialog "Buka dengan"
     var openWithTarget by remember { mutableStateOf<FileItem?>(null) }
     val notReady = stringResource(R.string.msg_not_ready)
+    var mcpOpen by remember { mutableStateOf(false) }
 
     // Tombol kembali: tutup menu, lalu tutup pencarian/pilihan, lalu naik satu folder, lalu keluar
     BackHandler {
@@ -255,6 +256,10 @@ fun MainScreen(
                 onTrash = {
                     scope.launch { drawerState.close() }
                     onOpenTrash()
+                },
+                onMcp = {
+                    scope.launch { drawerState.close() }
+                    mcpOpen = true
                 },
                 onNotReady = {
                     scope.launch { drawerState.close() }
@@ -488,6 +493,10 @@ fun MainScreen(
                 }
             },
         )
+    }
+
+    if (mcpOpen) {
+        McpDialog(onDismiss = { mcpOpen = false })
     }
 
     if (sortOpen) {
@@ -1173,6 +1182,7 @@ private fun DrawerSheet(
     onApps: () -> Unit,
     onTerminal: () -> Unit,
     onTrash: () -> Unit,
+    onMcp: () -> Unit,
     onNotReady: () -> Unit,
 ) {
     val storageLabel = stringResource(R.string.title_storage)
@@ -1185,7 +1195,7 @@ private fun DrawerSheet(
     val tools = listOf(
         DrawerTool(R.string.tool_apps, Icons.Filled.Layers, onApps),
         DrawerTool(R.string.tool_toolbox, Icons.Filled.Build, null),
-        DrawerTool(R.string.tool_apk_mcp, Icons.Filled.SmartToy, null),
+        DrawerTool(R.string.tool_apk_mcp, Icons.Filled.SmartToy, onMcp),
         DrawerTool(R.string.tool_ftp, Icons.Filled.Cloud, null),
         DrawerTool(R.string.tool_http, Icons.Filled.Language, null),
         DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, null),

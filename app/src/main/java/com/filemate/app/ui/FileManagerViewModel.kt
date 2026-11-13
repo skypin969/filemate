@@ -10,6 +10,7 @@ import com.filemate.app.data.FileItem
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
 import com.filemate.app.data.Trash
+import com.filemate.app.mcp.McpService
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +139,14 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         // Akses root dicoba otomatis setiap aplikasi dibuka. Jika izin sudah diberikan di aplikasi
         // pengelola root (Magisk, KernelSU), mode root langsung aktif tanpa tombol.
         setRootMode(true, quiet = true)
+        // Sakelar "Mulai layanan secara otomatis saat aplikasi dibuka" di dialog APK MCP
+        if (prefs.getBoolean(AppPrefs.KEY_MCP_AUTO, false)) {
+            try {
+                McpService.start(app)
+            } catch (e: Exception) {
+                // Android bisa menolak jika aplikasi belum tampil di layar. Layanan bisa dimulai manual.
+            }
+        }
     }
 
     /** Folder awal: folder beranda pilihan user jika masih bisa dibuka, kalau tidak penyimpanan internal. */
