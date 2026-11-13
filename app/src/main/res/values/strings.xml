@@ -360,4 +360,5 @@
     <string name="dex_failed">Berkas ini tidak bisa dibaca sebagai DEX atau APK.</string>
     <string name="dex_no_file">Buka dulu folder yang berisi berkas APK atau DEX.</string>
     <string name="new_text_hint">Nama berkas, misalnya catatan.txt</string>
+    <string name="mcp_group_dex">Dex</string>
 </resources>

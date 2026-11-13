@@ -87,18 +87,22 @@ object ActivityRecorder {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
 
+    @Volatile
+    private var keeping = false
+
     fun start(context: Context) {
         if (running.value) return
         running.value = true
         noRoot.value = false
-        KeepAliveService.acquire(context, "activity")
         job = scope.launch {
             if (!RootShell.isGranted()) {
                 noRoot.value = true
                 running.value = false
-                KeepAliveService.release(context, "activity")
                 return@launch
             }
+            // Layanan penjaga baru dinyalakan setelah root dipastikan ada
+            KeepAliveService.acquire(context, "activity")
+            keeping = true
             var last = ""
             while (isActive) {
                 val output = RootShell.run("dumpsys activity activities | grep -E 'ResumedActivity' | head -n 3").output
@@ -122,7 +126,8 @@ object ActivityRecorder {
     fun stop(context: Context) {
         job?.cancel()
         job = null
-        if (running.value) KeepAliveService.release(context, "activity")
+        if (keeping) KeepAliveService.release(context, "activity")
+        keeping = false
         running.value = false
     }
 }

@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import com.filemate.app.apk.ApkTools
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.Trash
+import com.filemate.app.ui.describeClass
+import com.filemate.app.ui.loadDexClasses
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -43,6 +45,7 @@ object McpTools {
     const val GROUP_OPEN = "open"
     const val GROUP_VIEW = "view"
     const val GROUP_BUILD = "build"
+    const val GROUP_DEX = "dex"
 
     private const val STORAGE = FileRepository.STORAGE_ROOT
     private const val MAX_TEXT = 64 * 1024
@@ -356,6 +359,38 @@ object McpTools {
                 val more = if (entry.size > bytes.size) "\n\n[truncated: entry is ${entry.size} bytes]" else ""
                 String(bytes, Charsets.UTF_8) + more
             }
+        },
+
+        // ---------- Dex ----------
+        McpTool(
+            "fm_dex_list_classes", GROUP_DEX,
+            "List the classes inside an APK (all classes*.dex) or a single .dex file. Use prefix to narrow down to one package, e.g. com.example.",
+            write = false,
+            params = listOf(
+                McpParam("path", "string", "Absolute path of the .apk or .dex file"),
+                McpParam("prefix", "string", "Only classes whose name starts with this text", required = false),
+            ),
+        ) { _, a ->
+            val file = existing(a.path("path"))
+            val prefix = a.optString("prefix")
+            val matching = loadDexClasses(file).filter { it.name.startsWith(prefix) }
+            val list = JSONArray()
+            matching.take(2000).forEach { list.put(it.name) }
+            JSONObject().put("total", matching.size).put("shown", list.length()).put("classes", list).toString(2)
+        },
+        McpTool(
+            "fm_dex_class_outline", GROUP_DEX,
+            "Show the outline of one class from an APK or .dex file: superclass, interfaces, fields and method signatures.",
+            write = false,
+            params = listOf(
+                McpParam("path", "string", "Absolute path of the .apk or .dex file"),
+                McpParam("class", "string", "Full class name, e.g. com.example.MainActivity"),
+            ),
+        ) { _, a ->
+            val file = existing(a.path("path"))
+            val name = a.optString("class")
+            val found = loadDexClasses(file).firstOrNull { it.name == name } ?: fail("Class not found: $name")
+            describeClass(found.def)
         },
 
         // ---------- Rakit dan tanda tangan ----------

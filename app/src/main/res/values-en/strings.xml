@@ -360,4 +360,5 @@
     <string name="dex_failed">This file cannot be read as DEX or APK.</string>
     <string name="dex_no_file">First open a folder that contains an APK or DEX file.</string>
     <string name="new_text_hint">File name, for example notes.txt</string>
+    <string name="mcp_group_dex">Dex</string>
 </resources>

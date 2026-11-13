@@ -58,5 +58,8 @@ Folder ini berisi kode lengkap aplikasi Filemate. Ada dua cara membangun APK-nya
 | `.../ui/FileManagerViewModel.kt` | Otak aplikasi: panel, pilihan, operasi berkas |
 | `.../data/` | Membaca folder, operasi berkas, dan perintah root |
 | `.../apk/` | Alat APK: pembaca manifest, bongkar, rakit ulang, tanda tangan |
+| `.../mcp/` | Layanan APK MCP: server, daftar alat untuk aplikasi AI |
+| `.../net/` | Server FTP, server HTTP, Transfer LAN, dan layanan penjaga latar belakang |
+| `.../ui/Tools*.kt` | Alat di menu samping: toolbox, jaringan, desibel, perekam aktivitas, analisis kelas, dan lainnya |
 | `app/src/main/res/values/` | Teks Bahasa Indonesia |
 | `app/src/main/res/values-en/` | Teks English |

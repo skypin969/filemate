@@ -326,6 +326,7 @@ private fun McpHelpDialog(onDismiss: () -> Unit) {
     val groups = listOf(
         McpTools.GROUP_OPEN to R.string.mcp_group_open,
         McpTools.GROUP_VIEW to R.string.mcp_group_view,
+        McpTools.GROUP_DEX to R.string.mcp_group_dex,
         McpTools.GROUP_BUILD to R.string.mcp_group_build,
         McpTools.GROUP_FILES to R.string.mcp_group_files,
     )
