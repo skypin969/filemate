@@ -294,6 +294,9 @@ fun MainScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // Menu samping hanya dibuka lewat tombol garis tiga. Geseran di daftar dipakai untuk menandai
+        // berkas. Setelah terbuka, menu tetap bisa ditutup dengan geseran.
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             DrawerSheet(
                 bookmarks = state.bookmarks,

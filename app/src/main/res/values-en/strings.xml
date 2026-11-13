@@ -410,4 +410,5 @@
     <string name="jar_failed">This JAR could not be converted to DEX.</string>
     <string name="msg_volume_connected">%1$s connected</string>
     <string name="msg_volume_removed">%1$s removed</string>
+    <string name="trash_confirm_forever">%1$d items will be deleted forever and cannot be restored.</string>
 </resources>

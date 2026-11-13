@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
@@ -50,21 +53,41 @@ import kotlinx.coroutines.withContext
 
 /**
  * Layar Recycle Bin seperti NP Manager: daftar berkas yang sudah dihapus.
- * Mengetuk satu berkas memberi pilihan memulihkan atau menghapusnya selamanya.
+ * Mengetuk atau menggeser satu berkas menandainya. Berkas yang ditandai bisa dipulihkan
+ * atau dihapus permanen sekaligus lewat tombol di bawah.
  */
 @Composable
 fun TrashScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<TrashEntry>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
-    var picked by remember { mutableStateOf<TrashEntry?>(null) }
+    // Nama berkas simpanan yang sedang ditandai
+    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     suspend fun reload() {
         entries = withContext(Dispatchers.IO) { Trash.list() }
+        selected = selected.filter { name -> entries.any { it.stored.name == name } }.toSet()
         loaded = true
     }
 
-    BackHandler { onBack() }
+    fun toggle(entry: TrashEntry) {
+        val name = entry.stored.name
+        selected = if (name in selected) selected - name else selected + name
+    }
+
+    /** Menjalankan [work] untuk semua berkas yang ditandai, lalu memuat ulang daftar. */
+    fun forSelected(work: (TrashEntry) -> Unit) {
+        val targets = entries.filter { it.stored.name in selected }
+        selected = emptySet()
+        scope.launch {
+            withContext(Dispatchers.IO) { targets.forEach(work) }
+            reload()
+        }
+    }
+
+    // Tombol kembali membatalkan tanda dulu, baru keluar
+    BackHandler { if (selected.isNotEmpty()) selected = emptySet() else onBack() }
     LaunchedEffect(Unit) { reload() }
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -77,20 +100,44 @@ fun TrashScreen(onBack: () -> Unit) {
                 .padding(start = 4.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_back),
-                    tint = Color.White,
+            if (selected.isEmpty()) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.cd_back),
+                        tint = Color.White,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.tool_recycle),
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 12.dp),
                 )
+            } else {
+                IconButton(onClick = { selected = emptySet() }) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.cd_close),
+                        tint = Color.White,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.selected_count, selected.size),
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 12.dp).weight(1f),
+                )
+                IconButton(onClick = { selected = entries.map { it.stored.name }.toSet() }) {
+                    Icon(
+                        imageVector = Icons.Filled.DoneAll,
+                        contentDescription = stringResource(R.string.menu_select_all),
+                        tint = Color.White,
+                    )
+                }
             }
-            Text(
-                text = stringResource(R.string.tool_recycle),
-                color = Color.White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 12.dp),
-            )
         }
 
         if (loaded && entries.isEmpty()) {
@@ -102,12 +149,14 @@ fun TrashScreen(onBack: () -> Unit) {
             )
         }
 
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().navigationBarsPadding()) {
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
             items(entries, key = { it.stored.name }) { entry ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { picked = entry }
+                        .background(if (entry.stored.name in selected) SelectTint else Color.Transparent)
+                        .swipeSelect(entry.stored.name) { toggle(entry) }
+                        .clickable { toggle(entry) }
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -136,34 +185,51 @@ fun TrashScreen(onBack: () -> Unit) {
                 }
             }
         }
+
+        // Tombol untuk berkas yang ditandai
+        if (selected.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SoftGray)
+                    .navigationBarsPadding(),
+            ) {
+                TrashChoice(stringResource(R.string.trash_restore), Ink, Modifier.weight(1f)) {
+                    forSelected { Trash.restore(it) }
+                }
+                TrashChoice(stringResource(R.string.trash_delete_forever), Danger, Modifier.weight(1f)) {
+                    confirmDelete = true
+                }
+            }
+        } else {
+            Spacer(Modifier.navigationBarsPadding())
+        }
     }
 
-    val entry = picked
-    if (entry != null) {
-        Dialog(onDismissRequest = { picked = null }) {
+    if (confirmDelete) {
+        Dialog(onDismissRequest = { confirmDelete = false }) {
             Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-                Column(modifier = Modifier.padding(vertical = 14.dp)) {
+                Column(modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)) {
                     Text(
-                        text = entry.name,
+                        text = stringResource(R.string.trash_delete_forever),
                         color = Ink,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 22.dp),
                     )
-                    TrashChoice(stringResource(R.string.trash_restore)) {
-                        picked = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { Trash.restore(entry) }
-                            reload()
+                    Text(
+                        text = stringResource(R.string.trash_confirm_forever, selected.size),
+                        color = Danger,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        TrashChoice(stringResource(R.string.btn_cancel), Ink, Modifier.weight(1f)) {
+                            confirmDelete = false
                         }
-                    }
-                    TrashChoice(stringResource(R.string.trash_delete_forever)) {
-                        picked = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { Trash.deleteForever(entry) }
-                            reload()
+                        TrashChoice(stringResource(R.string.btn_ok), Danger, Modifier.weight(1f)) {
+                            confirmDelete = false
+                            forSelected { Trash.deleteForever(it) }
                         }
                     }
                 }
@@ -173,14 +239,15 @@ fun TrashScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun TrashChoice(label: String, onClick: () -> Unit) {
+private fun TrashChoice(label: String, color: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
         text = label,
-        color = Ink,
+        color = color,
         fontSize = 15.sp,
-        modifier = Modifier
-            .fillMaxWidth()
+        fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.Center,
+        modifier = modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 13.dp),
+            .padding(horizontal = 12.dp, vertical = 15.dp),
     )
 }

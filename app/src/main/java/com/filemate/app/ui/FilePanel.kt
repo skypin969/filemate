@@ -199,6 +199,8 @@ private fun FileRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (selected) SelectTint else Color.Transparent)
+            // Geser baris ke kiri atau kanan untuk menandai berkas, sama seperti mengetuk ikonnya
+            .swipeSelect(item.path, onIconClick)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .heightIn(min = (40 * style.scale).dp)
             .padding(horizontal = 6.dp, vertical = 3.dp),
