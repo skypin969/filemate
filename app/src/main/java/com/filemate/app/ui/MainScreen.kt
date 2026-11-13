@@ -1,6 +1,12 @@
 package com.filemate.app.ui
 
 import android.app.Activity
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Send
+import android.widget.Toast
+import android.net.Uri
+import android.content.Intent
+import android.content.Context
 import android.os.StatFs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -1357,7 +1363,7 @@ private class DrawerTool(val label: Int, val icon: ImageVector, val action: (() 
 
 /**
  * Menu samping, susunannya mengikuti NP Manager: kepala biru, lalu bagian Lokal,
- * Bookmark, Alat, dan Lainnya yang masing-masing bisa dilipat.
+ * Bookmark, Alat, dan Kontak yang masing-masing bisa dilipat.
  */
 @Composable
 private fun DrawerSheet(
@@ -1375,6 +1381,7 @@ private fun DrawerSheet(
     onNotReady: () -> Unit,
 ) {
     val storageLabel = stringResource(R.string.title_storage)
+    val context = LocalContext.current
     var localOpen by remember { mutableStateOf(true) }
     var bookmarkOpen by remember { mutableStateOf(false) }
     var toolsOpen by remember { mutableStateOf(true) }
@@ -1512,13 +1519,55 @@ private fun DrawerSheet(
                 tools.forEach { tool ->
                     DrawerRow(stringResource(tool.label), tool.icon, tool.action ?: onNotReady)
                 }
-            }
-
-            DrawerSection(stringResource(R.string.drawer_section_other), otherOpen) { otherOpen = !otherOpen }
-            if (otherOpen) {
                 DrawerRow(stringResource(R.string.drawer_settings), Icons.Filled.Settings, onSettings)
             }
+
+            DrawerSection(stringResource(R.string.drawer_section_contact), otherOpen) { otherOpen = !otherOpen }
+            if (otherOpen) {
+                ContactRow("Telegram", "@Skypin969", Icons.Filled.Send) {
+                    openLink(context, "https://t.me/Skypin969")
+                }
+                ContactRow("GitHub", "github.com/skypin969", Icons.Filled.Person) {
+                    openLink(context, "https://github.com/skypin969")
+                }
+            }
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** Membuka tautan di aplikasi yang cocok (Telegram, peramban). */
+private fun openLink(context: Context, url: String) {
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.contact_open_failed, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Baris kontak di menu samping: ikon, nama layanan, dan alamat akun di bawahnya. */
+@Composable
+private fun ContactRow(label: String, address: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 16.dp, end = 12.dp, top = 7.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DrawerIcon(icon)
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, color = MenuIcon, fontSize = 15.sp, maxLines = 1)
+            Text(
+                text = address,
+                color = Muted,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

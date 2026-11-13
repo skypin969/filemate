@@ -217,7 +217,8 @@
     <string name="terminal_run">Jalankan</string>
     <string name="editor_undo">Urungkan</string>
     <string name="editor_redo">Ulangi</string>
-    <string name="drawer_section_other">Lainnya</string>
+    <string name="drawer_section_contact">Kontak</string>
+    <string name="contact_open_failed">Tidak ada aplikasi untuk membuka tautan ini</string>
     <string name="tool_apps">Manajemen aplikasi</string>
     <string name="tool_toolbox">Toolbox</string>
     <string name="tool_apk_mcp">APK MCP</string>
