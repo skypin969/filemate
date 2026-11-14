@@ -614,5 +614,5 @@
     <string name="settings_shizuku_desc">Open the Shizuku download page</string>
     <string name="settings_launcher_title">launcher icon</string>
     <string name="settings_launcher_light">Light background (adaptive)</string>
-    <string name="settings_launcher_dark">Follows theme colour (adaptive)</string>
+    <string name="settings_launcher_dark">Follows theme colour</string>
 </resources>
