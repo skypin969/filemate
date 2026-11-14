@@ -260,7 +260,6 @@
     <string name="tool_smali_query">Kueri sintaks Smali</string>
     <string name="tool_network">Alat jaringan</string>
     <string name="tool_terminal">Emulator terminal</string>
-    <string name="tool_activity_record">Perekaman aktivitas</string>
     <string name="tool_layout_viewer">Penampil tata letak</string>
     <string name="tool_color_picker">Penampil mata layar</string>
     <string name="tool_ruler">Penggaris layar</string>
@@ -374,17 +373,13 @@
     <string name="db_note">Angka ini perkiraan dari mikrofon HP dan tidak dikalibrasi, jadi jangan dipakai untuk pengukuran resmi. Suara tidak direkam atau disimpan.</string>
     <string name="keep_channel">Layanan latar belakang</string>
     <string name="keep_title">Filemate bekerja di latar belakang</string>
-    <string name="keep_text">Ada layanan berkas atau perekam yang sedang berjalan.</string>
+    <string name="keep_text">Ada layanan berkas yang sedang berjalan.</string>
     <string name="net_ftp_desc">HP ini menjadi server FTP. Buka alamatnya dari aplikasi FTP di komputer atau HP lain untuk mengakses penyimpanan internal.</string>
     <string name="net_http_desc">HP ini menjadi server web. Buka alamatnya di peramban komputer atau HP lain untuk menjelajah dan mengunduh berkas dari penyimpanan internal.</string>
     <string name="net_lan_desc">Buka alamatnya di peramban perangkat lain untuk mengirim berkas ke HP ini. Berkas kiriman disimpan di folder Filemate/Terima dan bisa diunduh lagi dari halaman yang sama.</string>
     <string name="net_address">Alamat</string>
     <string name="net_ftp_login">Nama: %1$s\nSandi: %2$s</string>
     <string name="net_same_wifi">Kedua perangkat harus berada di Wi-Fi atau hotspot yang sama. Ketuk alamat untuk menyalin. Sandi dan kode alamat berganti setiap layanan dimulai.</string>
-    <string name="act_desc">Mencatat nama paket dan aktivitas (layar) aplikasi yang sedang tampil. Mulai perekaman, buka aplikasi lain, lalu kembali ke sini untuk melihat catatannya. Ketuk satu baris untuk menyalin.</string>
-    <string name="act_start">Mulai merekam</string>
-    <string name="act_stop">Berhenti</string>
-    <string name="act_clear">Kosongkan</string>
     <string name="cap_in">Ambil dalam %1$d detik</string>
     <string name="layout_desc">Menampilkan susunan elemen pada layar aplikasi lain. Ketuk tombol, pindah ke layar yang ingin diperiksa sebelum hitungan habis, lalu kembali ke sini.</string>
     <string name="color_desc">Mengambil warna dari layar aplikasi lain. Ketuk tombol, pindah ke layar yang ingin diambil sebelum hitungan habis, kembali ke sini, lalu ketuk titik pada gambar.</string>
@@ -593,7 +588,6 @@
     <string name="drawer_extract_apk">Ekstrak APK</string>
     <string name="drawer_text">Editor Teks</string>
     <string name="drawer_terminal">Simulator Terminal</string>
-    <string name="drawer_activity">Catatan Aktivitas</string>
     <string name="drawer_smali">Instruksi Smali</string>
     <string name="drawer_version">Versi %1$s</string>
     <string name="drawer_theme_toggle">Ganti tema terang atau gelap</string>

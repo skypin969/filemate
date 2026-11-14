@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Layanan latar depan serbaguna: selama ada pekerjaan latar belakang (server FTP/HTTP, perekam aktivitas),
+ * Layanan latar depan serbaguna: selama ada pekerjaan latar belakang (server FTP, HTTP, dan Transfer LAN),
  * layanan ini menjaga Filemate tidak dihentikan Android. Tiap pekerjaan mendaftar dengan sebuah nama.
  */
 class KeepAliveService : Service() {

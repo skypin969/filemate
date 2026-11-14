@@ -74,7 +74,6 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.ViewQuilt
-import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Wifi
@@ -1812,7 +1811,6 @@ private fun DrawerSheet(
         DrawerTool("extract_apk", R.string.drawer_extract_apk, Icons.Filled.Archive, onApps),
         DrawerTool("text", R.string.drawer_text, Icons.Filled.EditNote, onNewText),
         DrawerTool("terminal", R.string.drawer_terminal, Icons.Filled.Terminal, onTerminal),
-        DrawerTool("activity", R.string.drawer_activity, Icons.Filled.TrackChanges, { onTool(ToolKind.ACTIVITY) }),
         DrawerTool("smali", R.string.drawer_smali, Icons.Filled.Description, { onTool(ToolKind.SMALI) }),
         DrawerTool("apps", R.string.tool_apps, Icons.Filled.Layers, onApps),
         DrawerTool("toolbox", R.string.tool_toolbox, Icons.Filled.Build, { onTool(ToolKind.TOOLBOX) }),

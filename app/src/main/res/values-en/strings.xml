@@ -260,7 +260,6 @@
     <string name="tool_smali_query">Smali syntax lookup</string>
     <string name="tool_network">Network tools</string>
     <string name="tool_terminal">Terminal emulator</string>
-    <string name="tool_activity_record">Activity recorder</string>
     <string name="tool_layout_viewer">Layout viewer</string>
     <string name="tool_color_picker">Screen color picker</string>
     <string name="tool_ruler">Screen ruler</string>
@@ -374,17 +373,13 @@
     <string name="db_note">This number is an estimate from the phone microphone and is not calibrated, so do not use it for official measurements. Sound is not recorded or stored.</string>
     <string name="keep_channel">Background service</string>
     <string name="keep_title">Filemate is working in the background</string>
-    <string name="keep_text">A file service or recorder is running.</string>
+    <string name="keep_text">A file service is running.</string>
     <string name="net_ftp_desc">This phone becomes an FTP server. Open the address from an FTP app on a computer or another phone to access internal storage.</string>
     <string name="net_http_desc">This phone becomes a web server. Open the address in a browser on a computer or another phone to browse and download files from internal storage.</string>
     <string name="net_lan_desc">Open the address in a browser on another device to send files to this phone. Received files are saved in the Filemate/Terima folder and can be downloaded again from the same page.</string>
     <string name="net_address">Address</string>
     <string name="net_ftp_login">User: %1$s\nPassword: %2$s</string>
     <string name="net_same_wifi">Both devices must be on the same Wi-Fi or hotspot. Tap the address to copy it. The password and address code change each time the service starts.</string>
-    <string name="act_desc">Records the package and activity (screen) name of the app currently shown. Start recording, open another app, then come back here to see the log. Tap a line to copy it.</string>
-    <string name="act_start">Start recording</string>
-    <string name="act_stop">Stop</string>
-    <string name="act_clear">Clear</string>
     <string name="cap_in">Capture in %1$d seconds</string>
     <string name="layout_desc">Shows the element structure of another app screen. Tap a button, switch to the screen you want to inspect before the countdown ends, then come back here.</string>
     <string name="color_desc">Picks a color from another app screen. Tap a button, switch to the screen you want before the countdown ends, come back here, then tap a point on the image.</string>
@@ -593,7 +588,6 @@
     <string name="drawer_extract_apk">Extract APK</string>
     <string name="drawer_text">Text editor</string>
     <string name="drawer_terminal">Terminal simulator</string>
-    <string name="drawer_activity">Activity log</string>
     <string name="drawer_smali">Smali instructions</string>
     <string name="drawer_version">Version %1$s</string>
     <string name="drawer_theme_toggle">Switch between light and dark theme</string>

@@ -17,9 +17,25 @@ android {
         versionName = "9.6.9"
     }
 
+    // Tanda tangan rilis dipasang hanya jika FILEMATE_KEYSTORE_PATH terisi (lewat workflow Release APK).
+    // Kuncinya tidak pernah disimpan di repo: isinya datang dari GitHub Secrets.
+    signingConfigs {
+        create("release") {
+            System.getenv("FILEMATE_KEYSTORE_PATH")?.let { path ->
+                storeFile = file(path)
+                storePassword = System.getenv("FILEMATE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FILEMATE_KEY_ALIAS")
+                keyPassword = System.getenv("FILEMATE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (System.getenv("FILEMATE_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

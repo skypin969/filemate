@@ -58,7 +58,6 @@ val DRAWER_TOOL_LABELS: List<Pair<String, Int>> = listOf(
     "extract_apk" to R.string.drawer_extract_apk,
     "text" to R.string.drawer_text,
     "terminal" to R.string.drawer_terminal,
-    "activity" to R.string.drawer_activity,
     "smali" to R.string.drawer_smali,
     "apps" to R.string.tool_apps,
     "toolbox" to R.string.tool_toolbox,

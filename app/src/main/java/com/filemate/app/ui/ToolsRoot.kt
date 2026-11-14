@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,134 +50,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.filemate.app.R
 import com.filemate.app.data.RootShell
-import com.filemate.app.net.KeepAliveService
 import java.io.File
 import java.io.StringReader
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 
-// Ketiga alat di berkas ini memakai akses root, bukan izin aksesibilitas atau tampil di atas aplikasi lain.
-
-// ---------- Perekaman aktivitas ----------
-
-/**
- * Perekam aktivitas: setiap detik menanyakan ke sistem (lewat root) layar mana yang sedang tampil,
- * dan mencatatnya setiap kali berubah. Tetap berjalan saat Filemate ditinggal ke aplikasi lain.
- */
-object ActivityRecorder {
-    val running = MutableStateFlow(false)
-    val log = MutableStateFlow<List<String>>(emptyList())
-
-    /** True jika perekaman gagal dimulai karena akses root tidak ada. */
-    val noRoot = MutableStateFlow(false)
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var job: Job? = null
-
-    @Volatile
-    private var keeping = false
-
-    fun start(context: Context) {
-        if (running.value) return
-        running.value = true
-        noRoot.value = false
-        job = scope.launch {
-            if (!RootShell.isGranted()) {
-                noRoot.value = true
-                running.value = false
-                return@launch
-            }
-            // Layanan penjaga baru dinyalakan setelah root dipastikan ada
-            KeepAliveService.acquire(context, "activity")
-            keeping = true
-            var last = ""
-            while (isActive) {
-                val output = RootShell.run("dumpsys activity activities | grep -E 'ResumedActivity' | head -n 3").output
-                val match = Regex("([A-Za-z0-9_.]+)/([A-Za-z0-9_.\\$]+)").find(output)
-                if (match != null) {
-                    val pkg = match.groupValues[1]
-                    val name = match.groupValues[2]
-                    // ".Nama" adalah bentuk singkat dari "paket.Nama"
-                    val full = pkg + "\n" + (if (name.startsWith(".")) pkg + name else name)
-                    if (full != last) {
-                        last = full
-                        val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-                        log.update { (listOf("$time\n$full") + it).take(500) }
-                    }
-                }
-                delay(1000)
-            }
-        }
-    }
-
-    fun stop(context: Context) {
-        job?.cancel()
-        job = null
-        if (keeping) KeepAliveService.release(context, "activity")
-        keeping = false
-        running.value = false
-    }
-}
-
-@Composable
-fun ActivityRecordScreen(onBack: () -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val clipboard = LocalClipboardManager.current
-    val running by ActivityRecorder.running.collectAsState()
-    val noRoot by ActivityRecorder.noRoot.collectAsState()
-    val log by ActivityRecorder.log.collectAsState()
-    val copied = stringResource(R.string.tool_copied)
-
-    ToolScaffold(stringResource(R.string.tool_activity_record), onBack) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(stringResource(R.string.act_desc), color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
-            Spacer(Modifier.padding(top = 10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton(stringResource(if (running) R.string.act_stop else R.string.act_start)) {
-                    if (running) ActivityRecorder.stop(context) else ActivityRecorder.start(context)
-                }
-                PillButton(stringResource(R.string.act_clear), enabled = log.isNotEmpty()) {
-                    ActivityRecorder.log.value = emptyList()
-                }
-            }
-            if (noRoot) {
-                Spacer(Modifier.padding(top = 8.dp))
-                Text(stringResource(R.string.tool_need_root), color = Danger, fontSize = 13.sp)
-            }
-        }
-        LazyColumn(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-            items(log) { line ->
-                Text(
-                    text = line,
-                    color = Ink,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            // Yang disalin adalah nama aktivitas lengkap (baris terakhir)
-                            clipboard.setText(AnnotatedString(line.substringAfterLast('\n')))
-                            Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
-                        }
-                        .padding(horizontal = 16.dp, vertical = 7.dp),
-                )
-            }
-        }
-    }
-}
+// Kedua alat di berkas ini memakai akses root, bukan izin aksesibilitas atau tampil di atas aplikasi lain.
 
 // ---------- Hitung mundur bersama ----------
 

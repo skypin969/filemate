@@ -63,7 +63,6 @@ fun FilemateApp() {
             ToolKind.RULER -> RulerScreen(close)
             ToolKind.NETWORK -> NetworkToolsScreen(close)
             ToolKind.DECIBEL -> DecibelScreen(close)
-            ToolKind.ACTIVITY -> ActivityRecordScreen(close)
             ToolKind.LAYOUT -> LayoutViewerScreen(close)
             ToolKind.COLOR -> ColorPickerScreen(close)
             ToolKind.CLASSES -> ClassAnalysisScreen(openTool.second.orEmpty(), close)

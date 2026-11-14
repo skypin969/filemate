@@ -91,7 +91,7 @@ import kotlinx.coroutines.withContext
 
 /** Alat yang dibuka dari menu samping sebagai layar penuh. */
 enum class ToolKind {
-    TOOLBOX, TIMESTAMP, SMALI, RULER, NETWORK, DECIBEL, ACTIVITY, LAYOUT, COLOR, CLASSES, FTP, HTTP, LAN, FONT, KEYS, PASSWORDS,
+    TOOLBOX, TIMESTAMP, SMALI, RULER, NETWORK, DECIBEL, LAYOUT, COLOR, CLASSES, FTP, HTTP, LAN, FONT, KEYS, PASSWORDS,
 }
 
 /** Kerangka layar alat: bilah atas dengan tombol kembali dan judul, lalu isi di bawahnya. */
