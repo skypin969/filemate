@@ -83,6 +83,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Menerima hasil pemasangan APK dari sistem (Instalasi berhasil atau gagal) -->
+        <receiver
+            android:name=".apk.ApkInstallReceiver"
+            android:exported="false" />
+
         <!-- Server MCP supaya aplikasi AI bisa memakai alat Filemate -->
         <service
             android:name=".mcp.McpService"

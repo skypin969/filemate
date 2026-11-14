@@ -13,6 +13,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.filemate.app.R
+import com.filemate.app.apk.ApkInfoReader
+import com.filemate.app.apk.ApkInstallEvent
+import com.filemate.app.apk.ApkInstallEvents
+import com.filemate.app.apk.ApkInstaller
 import com.filemate.app.apk.ApkTools
 import com.filemate.app.data.Archive
 import com.filemate.app.data.FileItem
@@ -74,12 +78,36 @@ sealed interface AppDialog {
     data object TypeFilterPicker : AppDialog
 }
 
-/** Keadaan dialog alat APK. */
+/** Keadaan dialog alat APK: rincian untuk kartu info, isi manifest, dan status proses terakhir. */
 data class ApkInfo(
     val path: String,
     val manifest: String = "",
     val busy: Boolean = false,
+    val loading: Boolean = false,
     val status: String = "",
+    val label: String = "",
+    val packageName: String = "",
+    val versionName: String = "",
+    val versionCode: Long = 0L,
+    val size: Long = 0L,
+    val signature: String = "",
+    val protector: String? = null,
+    val minSdk: Int = 0,
+    val targetSdk: Int = 0,
+    val installed: Boolean = false,
+    val installedPath: String = "",
+    val installedUid: Int = 0,
+)
+
+/** Tahap pemasangan APK yang tampil di layar. */
+enum class ApkPhase { RUNNING, DONE, FAILED }
+
+/** Keadaan pemasangan APK. Jika [visible] false, dialognya disembunyikan tapi pemasangan tetap jalan. */
+data class ApkInstallState(
+    val fileName: String,
+    val phase: ApkPhase = ApkPhase.RUNNING,
+    val message: String = "",
+    val visible: Boolean = true,
 )
 
 data class UiState(
@@ -100,6 +128,7 @@ data class UiState(
     val clip: Clip? = null,
     val dialog: AppDialog? = null,
     val apk: ApkInfo? = null,
+    val apkInstall: ApkInstallState? = null,
     val message: String? = null,
     /** Berkas yang baru saja disalin atau dipindah. Namanya diberi warna di daftar supaya mudah ditemukan. */
     val fresh: Set<String> = emptySet(),
@@ -1078,22 +1107,66 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Alat APK ----------
 
-    fun openApk(path: String) {
-        _state.update { it.copy(dialog = AppDialog.Apk(path), apk = ApkInfo(path = path, busy = true)) }
+    init {
+        // Hasil pemasangan dari sistem (lihat ApkInstallReceiver), diterima selama aplikasi terbuka
         viewModelScope.launch {
-            val manifest = withContext(Dispatchers.IO) {
-                try {
-                    ApkTools.readManifest(ensureReadable(path)).take(MAX_MANIFEST_CHARS)
-                } catch (e: Exception) {
-                    text(R.string.apk_manifest_failed)
+            ApkInstallEvents.events.collect { event ->
+                when (event) {
+                    is ApkInstallEvent.Success -> finishInstall(ok = true, detail = "")
+                    is ApkInstallEvent.Failed -> finishInstall(ok = false, detail = event.message)
                 }
             }
-            updateApk { it.copy(busy = false, manifest = manifest) }
+        }
+    }
+
+    fun openApk(path: String) {
+        _state.update {
+            it.copy(dialog = AppDialog.Apk(path), apk = ApkInfo(path = path, busy = true, loading = true))
+        }
+        viewModelScope.launch {
+            val loaded: Triple<String, ApkInfoReader.Summary, ApkInfoReader.Installed?> = withContext(Dispatchers.IO) {
+                try {
+                    val file = ensureReadable(path)
+                    val manifest = ApkTools.readManifest(file).take(MAX_MANIFEST_CHARS)
+                    val summary = ApkInfoReader.read(getApplication<Application>(), file)
+                    val installed = ApkInfoReader.installed(getApplication<Application>(), summary.packageName)
+                    Triple(manifest, summary, installed)
+                } catch (e: Exception) {
+                    Triple(text(R.string.apk_manifest_failed), ApkInfoReader.Summary(), null)
+                }
+            }
+            val (manifest, summary, installed) = loaded
+            updateApkFor(path) {
+                it.copy(
+                    busy = false,
+                    loading = false,
+                    manifest = manifest,
+                    label = summary.label,
+                    packageName = summary.packageName,
+                    versionName = summary.versionName,
+                    versionCode = summary.versionCode,
+                    size = summary.size,
+                    signature = summary.signature,
+                    protector = summary.protector,
+                    minSdk = summary.minSdk,
+                    targetSdk = summary.targetSdk,
+                    installed = installed != null,
+                    installedPath = installed?.path.orEmpty(),
+                    installedUid = installed?.uid ?: 0,
+                )
+            }
         }
     }
 
     fun dismissApk() {
-        _state.update { it.copy(dialog = null, apk = null) }
+        _state.update { s ->
+            s.copy(
+                dialog = null,
+                apk = null,
+                // Pemasangan yang masih berjalan tetap jalan, hasilnya nanti tampil sebagai pesan singkat
+                apkInstall = s.apkInstall?.takeIf { it.phase == ApkPhase.RUNNING }?.copy(visible = false),
+            )
+        }
     }
 
     fun unpackApk() {
@@ -1179,29 +1252,107 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
     fun installsWithRoot(): Boolean =
         _state.value.rootMode && prefs.getBoolean(AppPrefs.KEY_ROOT_INSTALL, true)
 
-    /** Memasang APK lewat root dengan perintah pm, tanpa layar pemasang Android. */
-    fun installApkRoot() {
+    /**
+     * Memasang APK yang sedang dibuka. Lewat root jika pengaturannya menyala dan root aktif,
+     * kalau tidak lewat pemasang Android. Tahapnya tampil di dialog Installing dan Instalasi.
+     */
+    fun startInstall() {
+        if (_state.value.apk == null) return
+        if (_state.value.apkInstall?.phase == ApkPhase.RUNNING) {
+            // Pemasangan masih berjalan: tampilkan lagi dialognya, jangan mulai yang kedua
+            _state.update { it.copy(apkInstall = it.apkInstall?.copy(visible = true)) }
+            return
+        }
         val target = installTarget() ?: return
-        val installer = prefs.getString(AppPrefs.KEY_INSTALLER, "").orEmpty().trim()
-        updateApk { it.copy(busy = true, status = "") }
+        _state.update { it.copy(apkInstall = ApkInstallState(fileName = File(target).name)) }
+        if (installsWithRoot()) {
+            installWithRoot(target)
+            return
+        }
         viewModelScope.launch {
-            val status = withContext(Dispatchers.IO) {
+            val started = withContext(Dispatchers.IO) {
+                runCatching { ApkInstaller.start(getApplication<Application>(), File(target)) }.isSuccess
+            }
+            if (!started) {
+                // Sesi pemasang tidak bisa dibuat: serahkan ke layar pemasang Android seperti sebelumnya
+                installWithSystem(getApplication<Application>(), target)
+                _state.update { it.copy(apkInstall = null) }
+            }
+        }
+    }
+
+    /** Memasang APK lewat root dengan perintah pm, tanpa layar pemasang Android. */
+    private fun installWithRoot(target: String) {
+        val installer = prefs.getString(AppPrefs.KEY_INSTALLER, "").orEmpty().trim()
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
                 // pm tidak selalu bisa membaca penyimpanan internal, jadi APK disalin dulu ke folder sementara sistem
                 val temp = "/data/local/tmp/filemate_install.apk"
                 val source = RootShell.quote(target)
                 // Nama paket sumber hanya boleh huruf, angka, titik, dan garis bawah
                 val from = if (installer.matches(Regex("[A-Za-z0-9_.]+"))) "-i $installer " else ""
-                val result = RootShell.run(
+                RootShell.run(
                     "cp $source $temp && chmod 644 $temp && pm install -r $from$temp; code=\$?; rm -f $temp; exit \$code",
                 )
-                if (result.exitCode == 0) {
-                    text(R.string.msg_apk_installed)
+            }
+            finishInstall(ok = result.exitCode == 0, detail = result.output.trim().takeLast(200))
+        }
+    }
+
+    /** Menutup proses pemasangan dengan hasilnya. Jika dialognya sudah disembunyikan, hasilnya lewat pesan singkat. */
+    private fun finishInstall(ok: Boolean, detail: String) {
+        val current = _state.value.apkInstall ?: return
+        if (current.visible) {
+            _state.update {
+                it.copy(
+                    apkInstall = it.apkInstall?.copy(
+                        phase = if (ok) ApkPhase.DONE else ApkPhase.FAILED,
+                        message = detail,
+                    ),
+                )
+            }
+        } else {
+            val notice = if (ok) text(R.string.msg_apk_installed) else text(R.string.msg_apk_install_failed, detail)
+            _state.update { it.copy(apkInstall = null, message = notice) }
+        }
+        if (ok) refreshInstalled()
+    }
+
+    /** Membaca ulang keadaan APK di perangkat, supaya kartu menampilkan jalur dan UID setelah terpasang. */
+    private fun refreshInstalled() {
+        val packageName = _state.value.apk?.packageName.orEmpty()
+        if (packageName.isEmpty()) return
+        viewModelScope.launch {
+            val installed = withContext(Dispatchers.IO) {
+                ApkInfoReader.installed(getApplication<Application>(), packageName)
+            }
+            updateApk { info ->
+                if (info.packageName != packageName) {
+                    info
                 } else {
-                    text(R.string.msg_apk_install_failed, result.output.trim().takeLast(200))
+                    info.copy(
+                        installed = installed != null,
+                        installedPath = installed?.path.orEmpty(),
+                        installedUid = installed?.uid ?: 0,
+                    )
                 }
             }
-            updateApk { it.copy(busy = false, status = status) }
         }
+    }
+
+    /** Menyembunyikan dialog Installing. Pemasangan tetap berjalan. */
+    fun hideApkInstall() {
+        _state.update { s -> s.copy(apkInstall = s.apkInstall?.copy(visible = false)) }
+    }
+
+    /** Menutup dialog hasil pemasangan. */
+    fun closeApkInstall() {
+        _state.update { it.copy(apkInstall = null) }
+    }
+
+    /** Mengubah kartu APK hanya jika yang sedang dibuka masih berkas yang sama. */
+    private fun updateApkFor(path: String, transform: (ApkInfo) -> ApkInfo) {
+        _state.update { s -> if (s.apk?.path == path) s.copy(apk = s.apk?.let(transform)) else s }
     }
 
     private fun updateApk(transform: (ApkInfo) -> ApkInfo) {

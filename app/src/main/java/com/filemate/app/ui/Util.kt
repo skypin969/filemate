@@ -3,6 +3,8 @@ package com.filemate.app.ui
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -133,4 +135,31 @@ fun openWith(context: Context, item: FileItem) {
     } catch (e: Exception) {
         Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
     }
+}
+
+/** Membuka halaman info aplikasi di pengaturan Android (tombol RINCIAN). */
+fun openAppDetails(context: Context, packageName: String) {
+    try {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:$packageName")),
+        )
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Membuka aplikasi yang sudah terpasang (tombol MELUNCURKAN). Mengembalikan false jika tidak bisa dibuka. */
+fun launchApp(context: Context, packageName: String): Boolean {
+    val launch = try {
+        context.packageManager.getLaunchIntentForPackage(packageName)
+    } catch (e: Exception) {
+        null
+    }
+    if (launch == null) {
+        Toast.makeText(context, R.string.msg_cannot_open, Toast.LENGTH_SHORT).show()
+        return false
+    }
+    context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    return true
 }

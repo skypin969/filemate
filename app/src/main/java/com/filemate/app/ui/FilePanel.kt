@@ -377,7 +377,7 @@ private val apkIconCache = ConcurrentHashMap<String, ImageBitmap>()
 
 /** Ikon asli dari dalam berkas APK. Selama belum termuat, tampil ikon Android biasa. */
 @Composable
-private fun ApkIcon(path: String, size: Dp) {
+internal fun ApkIcon(path: String, size: Dp) {
     val context = LocalContext.current
     val bitmap by produceState(initialValue = apkIconCache[path], path) {
         if (value == null) {

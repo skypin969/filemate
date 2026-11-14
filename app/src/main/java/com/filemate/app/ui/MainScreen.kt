@@ -242,12 +242,8 @@ fun MainScreen(
     val menuOrder = remember { MenuOrder.load(context) }
 
     fun doInstall() {
-        // Lewat root jika pengaturannya menyala dan root aktif, kalau tidak lewat pemasang Android
-        if (vm.installsWithRoot()) {
-            vm.installApkRoot()
-        } else {
-            vm.installTarget()?.let { installWithSystem(context, it) }
-        }
+        // Lewat root jika pengaturannya menyala dan root aktif, kalau tidak lewat pemasang Android (lihat startInstall)
+        vm.startInstall()
     }
     val rangeHint = stringResource(R.string.msg_range_hint)
     val shortcutAsked = stringResource(R.string.msg_shortcut_asked)
@@ -1027,9 +1023,10 @@ fun MainScreen(
         is AppDialog.Apk -> state.apk?.let { info ->
             ApkDialog(
                 info = info,
+                install = state.apkInstall,
+                onSign = { vm.signApk() },
                 onUnpack = { vm.unpackApk() },
                 onRepack = { vm.repackApk() },
-                onSign = { vm.signApk() },
                 // Pengaturan "Verifikasi pemasangan APK" dan "Konfirmasi ganda": periksa dulu, tanyakan jika perlu
                 onInstall = {
                     val verify = listPrefs.getBoolean(AppPrefs.KEY_VERIFY_INSTALL, true)
@@ -1042,6 +1039,16 @@ fun MainScreen(
                 onBrowse = {
                     vm.dismissApk()
                     vm.openFolder(state.active, info.path)
+                },
+                onHideInstall = { vm.hideApkInstall() },
+                onCloseInstall = { vm.closeApkInstall() },
+                onDetails = {
+                    vm.closeApkInstall()
+                    openAppDetails(context, info.packageName)
+                },
+                onLaunch = {
+                    vm.closeApkInstall()
+                    launchApp(context, info.packageName)
                 },
                 onDismiss = { vm.dismissApk() },
             )
