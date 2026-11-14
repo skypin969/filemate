@@ -71,6 +71,11 @@ val Accent: Color
         return if (!ThemeMode.dark && base.luminance() > 0.35f) darken(base, 0.6f) else base
     }
 
+// Aksen menu samping (bilah bagian, ikon baris, bilah storage). Tema bawaan memakai abu-abu seperti
+// ikon folder, jadi tetap hitam putih. Warna tema lain sama dengan Accent. Tombol dan sakelar tetap Accent.
+val DrawerAccent: Color
+    get() = if (ThemeColors.primary == ThemeColors.DEFAULT) FolderColor else Accent
+
 // Ikon folder: abu-abu pada tema bawaan, selain itu mengikuti warna tema
 val FolderColor: Color
     get() = when {

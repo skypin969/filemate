@@ -2101,7 +2101,7 @@ private fun DrawerRow(label: String, icon: ImageVector, onClick: () -> Unit) {
     }
 }
 
-/** Judul bagian menu samping: garis biru kecil, nama bagian, dan panah lipat di kanan. */
+/** Judul bagian menu samping: garis kecil, nama bagian, dan panah lipat di kanan. */
 @Composable
 private fun DrawerSection(title: String, open: Boolean, onToggle: () -> Unit) {
     Row(
@@ -2115,7 +2115,7 @@ private fun DrawerSection(title: String, open: Boolean, onToggle: () -> Unit) {
             modifier = Modifier
                 .width(3.dp)
                 .height(14.dp)
-                .background(Accent),
+                .background(DrawerAccent),
         )
         Spacer(Modifier.width(10.dp))
         Text(
@@ -2134,7 +2134,7 @@ private fun DrawerSection(title: String, open: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/** Ikon biru di dalam kotak biru muda, dipakai semua baris menu samping. */
+/** Ikon berwarna aksen di dalam kotak abu-abu, dipakai semua baris menu samping. */
 @Composable
 private fun DrawerIcon(icon: ImageVector) {
     Box(
@@ -2147,7 +2147,7 @@ private fun DrawerIcon(icon: ImageVector) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Accent,
+            tint = DrawerAccent,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -2204,12 +2204,12 @@ private fun StorageRow(
                 LinearProgressIndicator(
                     progress = { fraction },
                     modifier = Modifier.weight(1f).height(3.dp),
-                    color = Accent,
+                    color = DrawerAccent,
                     trackColor = LineColor,
                     drawStopIndicator = {},
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(text = "${(fraction * 100).toInt()}%", color = Accent, fontSize = 11.sp)
+                Text(text = "${(fraction * 100).toInt()}%", color = DrawerAccent, fontSize = 11.sp)
             }
             Spacer(Modifier.height(4.dp))
             Text(
