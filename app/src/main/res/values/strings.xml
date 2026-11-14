@@ -139,6 +139,10 @@
     <string name="apk_row_protection">Perlindungan</string>
     <string name="apk_row_sdk_target">SDK Target</string>
     <string name="apk_row_sdk_min">SDK Minimum</string>
+    <string name="apk_row_installed">Terpasang</string>
+    <string name="apk_row_data_dir">Direktori data</string>
+    <string name="apk_row_first_install">Dipasang</string>
+    <string name="apk_row_last_update">Diperbarui</string>
     <string name="apk_row_install_path">jalur APK</string>
     <string name="apk_row_uid">UID</string>
     <string name="apk_none">Tidak ada</string>

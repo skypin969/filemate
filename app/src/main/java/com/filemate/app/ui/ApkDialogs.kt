@@ -104,9 +104,9 @@ fun ApkDialog(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = DialogBg,
-            modifier = Modifier.fillMaxWidth(0.85f).widthIn(max = 420.dp),
+            modifier = Modifier.fillMaxWidth(0.87f).widthIn(max = 420.dp),
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ApkIcon(path = info.path, size = 52.dp)
                     Spacer(Modifier.width(12.dp))
@@ -114,12 +114,12 @@ fun ApkDialog(
                         Text(
                             text = info.label.ifEmpty { File(info.path).name },
                             color = Ink,
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(text = info.versionName, color = Muted, fontSize = 15.sp)
+                        Text(text = info.versionName, color = Muted, fontSize = 14.sp)
                     }
                 }
                 if (info.busy) {
@@ -143,9 +143,14 @@ fun ApkDialog(
                     stringResource(R.string.apk_row_sdk_min),
                     if (shown) sdkText(info.minSdk) else "",
                 )
-                if (info.installed) {
-                    ApkInfoRow(stringResource(R.string.apk_row_install_path), info.installedPath, maxLines = 1)
-                    ApkInfoRow(stringResource(R.string.apk_row_uid), info.installedUid.toString())
+                // Baris tambahan setelah aplikasi terpasang, urutannya sama dengan MT Manager
+                info.installed?.let { inst ->
+                    ApkInfoRow(stringResource(R.string.apk_row_installed), "${inst.versionName} (${inst.versionCode})")
+                    ApkInfoRow(stringResource(R.string.apk_row_data_dir), inst.dataDir, maxLines = 1)
+                    ApkInfoRow(stringResource(R.string.apk_row_install_path), inst.path, maxLines = 1)
+                    ApkInfoRow(stringResource(R.string.apk_row_first_install), ApkInfoReader.formatTime(inst.firstInstall))
+                    ApkInfoRow(stringResource(R.string.apk_row_last_update), ApkInfoReader.formatTime(inst.lastUpdate))
+                    ApkInfoRow(stringResource(R.string.apk_row_uid), inst.uid.toString())
                 }
                 if (info.status.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -221,7 +226,7 @@ fun ApkDialog(
 /** Satu baris rincian: nama di kiri, nilai di kanan, seperti tabel di kartu MT Manager. */
 @Composable
 private fun ApkInfoRow(label: String, value: String, maxLines: Int = 2) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(
             text = label,
             color = Ink,
@@ -370,7 +375,7 @@ private fun ApkInstallDialog(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = DialogBg,
-            modifier = Modifier.fillMaxWidth(0.85f).widthIn(max = 420.dp),
+            modifier = Modifier.fillMaxWidth(0.87f).widthIn(max = 420.dp),
         ) {
             Column(modifier = Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp, bottom = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,7 +407,7 @@ private fun ApkInstallDialog(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MtAmber)
                     Spacer(Modifier.height(4.dp))
                 } else {
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(if (install.phase == ApkPhase.DONE) 40.dp else 14.dp))
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         if (install.phase == ApkPhase.DONE) {
                             TextButton(

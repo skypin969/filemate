@@ -3,7 +3,10 @@ package com.filemate.app.apk
 import android.content.Context
 import android.content.pm.PackageManager
 import java.io.File
+import java.text.SimpleDateFormat
 import java.util.Collections
+import java.util.Date
+import java.util.Locale
 import java.util.zip.ZipFile
 
 /**
@@ -25,8 +28,16 @@ object ApkInfoReader {
         val targetSdk: Int = 0,
     )
 
-    /** Keadaan aplikasi di perangkat, jika sudah terpasang. */
-    data class Installed(val path: String, val uid: Int)
+    /** Keadaan aplikasi di perangkat, jika sudah terpasang. Ditampilkan sebagai baris tambahan di kartu. */
+    data class Installed(
+        val path: String,
+        val uid: Int,
+        val versionName: String,
+        val versionCode: Long,
+        val dataDir: String,
+        val firstInstall: Long,
+        val lastUpdate: Long,
+    )
 
     /** Pelindung yang dikenali dari nama library-nya di dalam APK. Hanya contoh yang umum. */
     private val PROTECTORS = listOf(
@@ -69,12 +80,25 @@ object ApkInfoReader {
     fun installed(context: Context, packageName: String): Installed? {
         if (packageName.isEmpty()) return null
         return try {
-            val app = context.packageManager.getPackageInfo(packageName, 0).applicationInfo ?: return null
-            Installed(path = app.sourceDir.orEmpty(), uid = app.uid)
+            val info = context.packageManager.getPackageInfo(packageName, 0)
+            val app = info.applicationInfo ?: return null
+            Installed(
+                path = app.sourceDir.orEmpty(),
+                uid = app.uid,
+                versionName = info.versionName.orEmpty(),
+                versionCode = info.longVersionCode,
+                dataDir = app.dataDir.orEmpty(),
+                firstInstall = info.firstInstallTime,
+                lastUpdate = info.lastUpdateTime,
+            )
         } catch (e: PackageManager.NameNotFoundException) {
             null
         }
     }
+
+    /** Waktu seperti di MT Manager, misalnya "2026-11-14 11:59:17", mengikuti zona waktu perangkat. */
+    fun formatTime(millis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(millis))
 
     /** Nama versi Android dari nomor API, misalnya 34 menjadi "14". Kosong jika nomornya tidak dikenal. */
     fun androidName(api: Int): String = when (api) {

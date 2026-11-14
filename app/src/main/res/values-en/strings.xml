@@ -139,6 +139,10 @@
     <string name="apk_row_protection">Protection</string>
     <string name="apk_row_sdk_target">Target SDK</string>
     <string name="apk_row_sdk_min">Minimum SDK</string>
+    <string name="apk_row_installed">Installed</string>
+    <string name="apk_row_data_dir">Data directory</string>
+    <string name="apk_row_first_install">Installed on</string>
+    <string name="apk_row_last_update">Updated on</string>
     <string name="apk_row_install_path">APK path</string>
     <string name="apk_row_uid">UID</string>
     <string name="apk_none">None</string>

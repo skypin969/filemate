@@ -94,9 +94,7 @@ data class ApkInfo(
     val protector: String? = null,
     val minSdk: Int = 0,
     val targetSdk: Int = 0,
-    val installed: Boolean = false,
-    val installedPath: String = "",
-    val installedUid: Int = 0,
+    val installed: ApkInfoReader.Installed? = null,
 )
 
 /** Tahap pemasangan APK yang tampil di layar. */
@@ -1150,9 +1148,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                     protector = summary.protector,
                     minSdk = summary.minSdk,
                     targetSdk = summary.targetSdk,
-                    installed = installed != null,
-                    installedPath = installed?.path.orEmpty(),
-                    installedUid = installed?.uid ?: 0,
+                    installed = installed,
                 )
             }
         }
@@ -1318,7 +1314,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         if (ok) refreshInstalled()
     }
 
-    /** Membaca ulang keadaan APK di perangkat, supaya kartu menampilkan jalur dan UID setelah terpasang. */
+    /** Membaca ulang keadaan APK di perangkat, supaya kartu menampilkan rincian terpasang setelah pemasangan selesai. */
     private fun refreshInstalled() {
         val packageName = _state.value.apk?.packageName.orEmpty()
         if (packageName.isEmpty()) return
@@ -1327,15 +1323,7 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
                 ApkInfoReader.installed(getApplication<Application>(), packageName)
             }
             updateApk { info ->
-                if (info.packageName != packageName) {
-                    info
-                } else {
-                    info.copy(
-                        installed = installed != null,
-                        installedPath = installed?.path.orEmpty(),
-                        installedUid = installed?.uid ?: 0,
-                    )
-                }
+                if (info.packageName != packageName) info else info.copy(installed = installed)
             }
         }
     }
