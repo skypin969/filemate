@@ -620,5 +620,5 @@
     <string name="settings_shizuku_desc">Buka halaman unduhan Shizuku</string>
     <string name="settings_launcher_title">ikon peluncur</string>
     <string name="settings_launcher_light">Latar Belakang Terang (adaptif)</string>
-    <string name="settings_launcher_dark">Latar Belakang Gelap (adaptif)</string>
+    <string name="settings_launcher_dark">Ikut Warna Tema (adaptif)</string>
 </resources>

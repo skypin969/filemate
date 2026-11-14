@@ -49,14 +49,11 @@ fun SplashScreen(onFinished: () -> Unit) {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(
-                painter = painterResource(R.drawable.logo_filemate),
-                contentDescription = stringResource(R.string.cd_app_icon),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(160.dp)
-                    .shadow(12.dp, RoundedCornerShape(36.dp))
-                    .clip(RoundedCornerShape(36.dp)),
+            FilemateLogo(
+                size = 160.dp,
+                corner = 36.dp,
+                elevation = 12.dp,
+                description = stringResource(R.string.cd_app_icon),
             )
             Spacer(Modifier.height(24.dp))
             Text(

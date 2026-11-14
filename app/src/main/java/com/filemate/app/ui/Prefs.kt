@@ -149,6 +149,7 @@ object AppPrefs {
         SigningKeys.customPassword = prefs.getString(KEY_SIGN_PASS, "").orEmpty()
         ThemeMode.manualDark = prefs.getBoolean(KEY_THEME_DARK, false)
         ThemeMode.followSystem = prefs.getBoolean(KEY_THEME_FOLLOW, false)
+        applyLauncherIcon(context, prefs.getBoolean(KEY_LAUNCHER_LIGHT, false), ThemeColors.primary)
     }
 
     /** Folder penyimpanan lokal tambahan yang tersimpan. */
@@ -183,23 +184,42 @@ object AppPrefs {
     }
 
     /**
-     * Mengganti ikon peluncur. Ada dua alias di AndroidManifest, dan hanya satu yang aktif.
+     * Mengganti ikon peluncur. Ada LauncherDark (bawaan, hitam putih), LauncherWarna01..21
+     * (ikut warna tema), dan LauncherLight (latar terang). Hanya satu yang aktif.
      * Perubahannya terlihat setelah peluncur (launcher) memuat ulang daftar aplikasi.
      */
-    fun applyLauncherIcon(context: Context, light: Boolean) {
+    fun applyLauncherIcon(context: Context, light: Boolean, primary: Int = ThemeColors.primary) {
         val pm = context.packageManager
-        val lightAlias = ComponentName(context, "com.filemate.app.LauncherLight")
-        val darkAlias = ComponentName(context, "com.filemate.app.LauncherDark")
-        pm.setComponentEnabledSetting(
-            lightAlias,
-            if (light) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.DONT_KILL_APP,
-        )
-        pm.setComponentEnabledSetting(
-            darkAlias,
-            if (light) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP,
-        )
+        val target = launcherAlias(light, primary)
+        val names = listOf("LauncherDark", "LauncherLight") +
+            (1 until ThemeColors.OPTIONS.size).map { "LauncherWarna%02d".format(it) }
+        for (name in names) {
+            val component = ComponentName(context, "com.filemate.app.$name")
+            // LauncherDark aktif dari manifest, jadi keadaan DEFAULT berarti aktif
+            val enabled = when (pm.getComponentEnabledSetting(component)) {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT -> name == "LauncherDark"
+                else -> false
+            }
+            val shouldEnable = name == target
+            if (enabled != shouldEnable) {
+                pm.setComponentEnabledSetting(
+                    component,
+                    if (shouldEnable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+            }
+        }
+    }
+
+    /** Nama alias ikon peluncur untuk pilihan terang/gelap dan warna tema [primary]. */
+    private fun launcherAlias(light: Boolean, primary: Int): String {
+        val index = ThemeColors.OPTIONS.indexOf(primary)
+        return when {
+            light -> "LauncherLight"
+            index <= 0 -> "LauncherDark"
+            else -> "LauncherWarna%02d".format(index)
+        }
     }
 
     fun of(context: Context): SharedPreferences =

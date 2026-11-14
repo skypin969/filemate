@@ -10,6 +10,7 @@ import com.filemate.app.data.RootShell
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -410,6 +411,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 theme = it
                 ThemeColors.primary = it
                 prefs.edit().putInt(AppPrefs.KEY_THEME, it).apply()
+                AppPrefs.applyLauncherIcon(context, launcherLight, it)
                 choice = null
             },
             onDismiss = { choice = null },
@@ -604,7 +606,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 }
 
-/** Dialog Pengaturan tema seperti NP Manager: tombol bulat di kiri dan batang warna di kanan. */
+/** Dialog Warna Tema seperti MT Manager: pilihan berbentuk kapsul dalam 3 kolom, dengan tanda centang. */
 @Composable
 private fun ThemeDialog(
     current: Int,
@@ -618,25 +620,24 @@ private fun ThemeDialog(
         title = { Text(stringResource(R.string.settings_theme_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                ThemeColors.OPTIONS.forEach { option ->
+                ThemeColors.OPTIONS.chunked(3).forEach { rowColors ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { selected = option },
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        RadioButton(
-                            selected = option == selected,
-                            onClick = { selected = option },
-                            colors = RadioButtonDefaults.colors(selectedColor = Accent),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(26.dp)
-                                .background(Color(option)),
-                        )
+                        rowColors.forEach { option ->
+                            ThemeSwatch(
+                                color = Color(option),
+                                selected = option == selected,
+                                modifier = Modifier.weight(1f),
+                                onClick = { selected = option },
+                            )
+                        }
+                        repeat(3 - rowColors.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }

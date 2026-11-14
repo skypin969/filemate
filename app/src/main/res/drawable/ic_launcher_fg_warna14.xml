@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon peluncur untuk warna tema ke-14: folder berwarna tema dan huruf putih. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF6667AB"
+        android:pathData="M30,38a4,4 0,0 1,4 -4h13l5,5h22a4,4 0,0 1,4 4v27a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40.3,57.4C41.1,55.5 43.3,55.4 44,57.3L47.3,66.6L53.5,48.6Q54.1,46.9 55.9,46.9H67.7M57,57H65" />
+</vector>
