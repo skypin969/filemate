@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material3.Icon
@@ -41,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -172,12 +169,7 @@ private fun ParentRow(style: ListStyle, onClick: () -> Unit) {
             .padding(horizontal = 6.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Filled.Folder,
-            contentDescription = null,
-            tint = FolderColor,
-            modifier = Modifier.size((30 * style.scale).dp),
-        )
+        FolderTileIcon((30 * style.scale).dp)
         Spacer(Modifier.width(8.dp))
         Text(text = "..", color = Ink, fontSize = (15 * style.scale).sp)
     }
@@ -256,12 +248,7 @@ private fun FileIcon(item: FileItem, style: ListStyle, packageFolders: Boolean) 
     val size = (30 * style.scale).dp
     when {
         item.isDir -> Box {
-            Icon(
-                imageVector = Icons.Filled.Folder,
-                contentDescription = null,
-                tint = FolderColor,
-                modifier = Modifier.size(size),
-            )
+            FolderTileIcon(size)
             // Ikon aplikasi kecil di pojok kanan bawah folder, seperti NP Manager
             if (packageFolders) {
                 PackageBadge(
@@ -276,22 +263,25 @@ private fun FileIcon(item: FileItem, style: ListStyle, packageFolders: Boolean) 
         style.thumbnails && item.extension in IMAGE_EXT && item.size <= style.thumbMaxBytes ->
             ImageThumb(item.path, size, style.thumbTimeoutMs)
 
-        // Berkas teks dan arsip punya bentuk ikon sendiri, warnanya tetap abu-abu gelap (tema hitam putih)
-        item.extension in TEXT_EXT -> Icon(
-            imageVector = Icons.Filled.Assignment,
-            contentDescription = null,
-            tint = MenuIcon,
-            modifier = Modifier.size(size),
-        )
+        // Jenis berkas lain memakai kotak berwarna dan ikon yang sama dengan dialog "Buka dengan"
+        else -> FileTypeIcon(item.extension, size)
+    }
+}
 
-        item.extension in ARCHIVE_EXT -> Icon(
-            imageVector = Icons.Filled.Archive,
-            contentDescription = null,
-            tint = MenuIcon,
-            modifier = Modifier.size(size),
-        )
+/** Ikon folder: kotak berwarna utama dengan ikon folder putih, seperti di MT Manager. */
+@Composable
+internal fun FolderTileIcon(size: Dp) {
+    OpenTileIcon(icon = Icons.Filled.Folder, color = Primary, size = size)
+}
 
-        else -> Icon(
+/** Ikon satu jenis berkas: kotak berwarna seperti di "Buka dengan", atau ikon berkas biasa jika jenisnya belum punya kotak. */
+@Composable
+internal fun FileTypeIcon(extension: String, size: Dp) {
+    val style = fileTileStyleFor(extension)
+    if (style != null) {
+        OpenTileIcon(icon = style.icon, color = style.color, size = size)
+    } else {
+        Icon(
             imageVector = Icons.Filled.InsertDriveFile,
             contentDescription = null,
             tint = FileTint,
@@ -324,12 +314,7 @@ private fun ImageThumb(path: String, size: Dp, timeoutMs: Long) {
             modifier = Modifier.size(size).clip(RoundedCornerShape(4.dp)),
         )
     } else {
-        Icon(
-            imageVector = Icons.Filled.Image,
-            contentDescription = null,
-            tint = FileTint,
-            modifier = Modifier.size(size),
-        )
+        FileTypeIcon(path.substringAfterLast('.', ""), size)
     }
 }
 
@@ -383,8 +368,6 @@ val FONT_EXT = setOf("TTF", "OTF", "TTC")
 
 /** Warna nama berkas yang baru disalin atau dipindah. */
 private val FreshGreen = Color(0xFF2E7D32)
-
-private val ARCHIVE_EXT = setOf("ZIP", "RAR", "7Z", "TAR", "GZ", "TGZ", "XZ", "BZ2", "JAR", "APKS", "XAPK")
 
 /** Berkas yang baru dibuat atau diubah (30 menit terakhir) namanya dicetak tebal. */
 private const val RECENT_MILLIS = 30L * 60 * 1000

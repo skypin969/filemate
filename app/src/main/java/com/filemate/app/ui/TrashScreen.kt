@@ -22,8 +22,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -160,12 +158,12 @@ fun TrashScreen(onBack: () -> Unit) {
                         .padding(horizontal = 8.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = if (entry.stored.isDirectory) Icons.Filled.Folder else Icons.Filled.InsertDriveFile,
-                        contentDescription = null,
-                        tint = if (entry.stored.isDirectory) FolderColor else FileTint,
-                        modifier = Modifier.size(30.dp),
-                    )
+                    // Ikon sama dengan daftar berkas: folder dan jenis berkas memakai kotak berwarna
+                    if (entry.stored.isDirectory) {
+                        FolderTileIcon(30.dp)
+                    } else {
+                        FileTypeIcon(entry.stored.name.substringAfterLast('.', ""), 30.dp)
+                    }
                     Spacer(Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

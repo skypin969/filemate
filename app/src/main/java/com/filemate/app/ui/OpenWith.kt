@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -112,6 +113,54 @@ private val CHOICES = listOf(
     OpenChoice(OpenMode.MARKDOWN, R.string.open_markdown, Icons.Filled.Tag, Color(0xFF5A4FA3)),
     OpenChoice(OpenMode.DATABASE, R.string.open_database, Icons.Filled.Storage, Color(0xFF00695C)),
 )
+
+/** Ikon dan warna kotak satu jenis berkas, sama dengan kotak di dialog "Buka dengan". */
+class FileTileStyle(val icon: ImageVector, val color: Color)
+
+// Akhiran berkas (huruf besar) dan cara buka yang ikonnya dipakai untuk berkas itu di daftar berkas
+private val TILE_EXTENSIONS: Map<String, OpenMode> = listOf(
+    OpenMode.TEXT to listOf("TXT", "LOG", "INI", "CONF", "CFG", "PROP", "PROPERTIES", "RC", "CSV", "JSON", "HTML", "HTM", "CSS", "JS", "JAVA", "KT", "KTS", "SMALI", "YML", "YAML", "PY", "C", "H", "CPP", "GRADLE"),
+    OpenMode.XML to listOf("XML"),
+    OpenMode.SVG to listOf("SVG"),
+    OpenMode.MARKDOWN to listOf("MD"),
+    OpenMode.SCRIPT to listOf("SH", "BAT"),
+    OpenMode.FONT to listOf("TTF", "OTF", "TTC"),
+    OpenMode.ARCHIVE to listOf("ZIP", "RAR", "7Z", "TAR", "GZ", "TGZ", "XZ", "BZ2"),
+    OpenMode.JAR to listOf("JAR"),
+    OpenMode.APKS to listOf("APKS", "XAPK"),
+    OpenMode.IMAGE to listOf("JPG", "JPEG", "PNG", "WEBP", "GIF", "BMP", "HEIC", "HEIF", "TIF", "TIFF", "ICO", "AVIF"),
+    OpenMode.VIDEO to listOf("MP4", "MKV", "AVI", "MOV", "3GP", "WEBM", "FLV", "M4V"),
+    OpenMode.MUSIC to listOf("MP3", "WAV", "OGG", "FLAC", "M4A", "AAC", "OPUS", "AMR", "MID", "MIDI", "WMA"),
+    OpenMode.PDF to listOf("PDF"),
+    OpenMode.DATABASE to listOf("DB", "DB3", "SQLITE", "SQLITE3"),
+    OpenMode.DEX to listOf("DEX"),
+    OpenMode.ARSC to listOf("ARSC"),
+    OpenMode.CLASS to listOf("CLASS"),
+    OpenMode.SIGNATURE to listOf("KEYSTORE", "JKS", "P12", "PFX", "PEM", "CER", "CRT", "DER", "RSA", "DSA", "EC"),
+).flatMap { (mode, exts) -> exts.map { it to mode } }.toMap()
+
+/** Ikon untuk berkas dengan akhiran [extension], atau null jika jenisnya belum punya ikon khusus. */
+fun fileTileStyleFor(extension: String): FileTileStyle? {
+    val mode = TILE_EXTENSIONS[extension.uppercase()] ?: return null
+    val choice = CHOICES.firstOrNull { it.mode == mode } ?: return null
+    return FileTileStyle(choice.icon, choice.tile)
+}
+
+/** Kotak berwarna dengan ikon putih di dalamnya, seperti kotak di dialog "Buka dengan" dan daftar berkas MT Manager. */
+@Composable
+fun OpenTileIcon(icon: ImageVector, color: Color, size: Dp) {
+    Box(
+        modifier = Modifier.size(size).clip(RoundedCornerShape(size * 0.29f)).background(color),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.54f),
+        )
+    }
+}
 
 /** Cara buka bawaan per akhiran berkas, disimpan di pengaturan. Diatur dengan menekan lama ikon di dialog "Buka dengan". */
 object OpenDefaults {
