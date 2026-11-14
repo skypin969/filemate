@@ -90,7 +90,7 @@ fun TrashScreen(onBack: () -> Unit) {
     BackHandler { if (selected.isNotEmpty()) selected = emptySet() else onBack() }
     LaunchedEffect(Unit) { reload() }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(Body)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -208,7 +208,7 @@ fun TrashScreen(onBack: () -> Unit) {
 
     if (confirmDelete) {
         Dialog(onDismissRequest = { confirmDelete = false }) {
-            Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+            Surface(shape = RoundedCornerShape(20.dp), color = DialogBg) {
                 Column(modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)) {
                     Text(
                         text = stringResource(R.string.trash_delete_forever),

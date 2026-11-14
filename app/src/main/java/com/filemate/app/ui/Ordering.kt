@@ -47,6 +47,7 @@ object MenuOrder {
         "edittext" to R.string.menu_edit_text,
         "bookmark" to R.string.menu_bookmark,
         "extra" to R.string.menu_order_extra,
+        "sign" to R.string.menu_sign,
     )
 
     /** Urutan kunci yang tersimpan. Kunci yang belum ada di simpanan (pilihan baru) ditaruh di belakang. */
@@ -89,7 +90,7 @@ fun ReorderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {

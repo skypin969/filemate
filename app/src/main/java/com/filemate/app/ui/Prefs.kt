@@ -1,7 +1,9 @@
 package com.filemate.app.ui
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import com.filemate.app.apk.SigningKeys
 import com.filemate.app.data.FileRepository
 import com.filemate.app.data.RootShell
@@ -113,6 +115,24 @@ object AppPrefs {
     /** minSdkVersion yang dipakai saat mengubah JAR menjadi DEX. */
     const val KEY_JAR_MIN_SDK = "jar_min_sdk"
 
+    /** Mode tema dari menu samping: mode gelap yang dipilih user, dan "Tema mengikuti sistem". */
+    const val KEY_THEME_DARK = "theme_dark"
+    const val KEY_THEME_FOLLOW = "theme_follow"
+
+    /** Preferensi Awal: minta akses root saat aplikasi dibuka, dan minta izin akses shell. */
+    const val KEY_ASK_ROOT = "ask_root"
+    const val KEY_ASK_SHELL = "ask_shell"
+
+    /** Ikon peluncur yang dipakai. true berarti versi latar belakang terang. */
+    const val KEY_LAUNCHER_LIGHT = "launcher_light"
+
+    /** Folder penyimpanan lokal tambahan dari menu samping, satu jalur per baris. */
+    const val KEY_LOCAL_STORAGES = "local_storages"
+
+    /** Urutan alat di menu samping, dan alat yang disembunyikan. Keduanya dipisah koma. */
+    const val KEY_TOOL_ORDER = "tool_order"
+    const val KEY_TOOL_HIDDEN = "tool_hidden"
+
     /**
      * Menerapkan pengaturan yang dipakai di banyak tempat: warna tema, perintah su, dan folder kerja.
      * Dipanggil sekali saat aplikasi atau layanan latar belakang mulai.
@@ -127,6 +147,59 @@ object AppPrefs {
         DateFormats.selected = prefs.getInt(KEY_DATE_FORMAT, 0)
         SigningKeys.customPath = prefs.getString(KEY_SIGN_KEY, "").orEmpty()
         SigningKeys.customPassword = prefs.getString(KEY_SIGN_PASS, "").orEmpty()
+        ThemeMode.manualDark = prefs.getBoolean(KEY_THEME_DARK, false)
+        ThemeMode.followSystem = prefs.getBoolean(KEY_THEME_FOLLOW, false)
+    }
+
+    /** Folder penyimpanan lokal tambahan yang tersimpan. */
+    fun localStorages(context: Context): List<String> =
+        of(context).getString(KEY_LOCAL_STORAGES, "").orEmpty().split('\n').filter { it.isNotBlank() }
+
+    fun saveLocalStorages(context: Context, paths: List<String>) {
+        of(context).edit().putString(KEY_LOCAL_STORAGES, paths.joinToString("\n")).apply()
+    }
+
+    /** Urutan alat yang tersimpan, dalam bentuk teks dengan koma di antara kuncinya. */
+    fun toolOrderText(context: Context): String = of(context).getString(KEY_TOOL_ORDER, "").orEmpty()
+
+    /** Kunci alat yang disembunyikan dari menu samping. */
+    fun toolHiddenKeys(context: Context): Set<String> =
+        of(context).getString(KEY_TOOL_HIDDEN, "").orEmpty()
+            .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    fun saveToolLayout(context: Context, order: List<String>, hidden: Set<String>) {
+        of(context).edit()
+            .putString(KEY_TOOL_ORDER, order.joinToString(","))
+            .putString(KEY_TOOL_HIDDEN, hidden.joinToString(","))
+            .apply()
+    }
+
+    /** Menyimpan mode gelap dan pilihan "Tema mengikuti sistem" dari [ThemeMode]. */
+    fun saveTheme(context: Context) {
+        of(context).edit()
+            .putBoolean(KEY_THEME_DARK, ThemeMode.manualDark)
+            .putBoolean(KEY_THEME_FOLLOW, ThemeMode.followSystem)
+            .apply()
+    }
+
+    /**
+     * Mengganti ikon peluncur. Ada dua alias di AndroidManifest, dan hanya satu yang aktif.
+     * Perubahannya terlihat setelah peluncur (launcher) memuat ulang daftar aplikasi.
+     */
+    fun applyLauncherIcon(context: Context, light: Boolean) {
+        val pm = context.packageManager
+        val lightAlias = ComponentName(context, "com.filemate.app.LauncherLight")
+        val darkAlias = ComponentName(context, "com.filemate.app.LauncherDark")
+        pm.setComponentEnabledSetting(
+            lightAlias,
+            if (light) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+        pm.setComponentEnabledSetting(
+            darkAlias,
+            if (light) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP,
+        )
     }
 
     fun of(context: Context): SharedPreferences =

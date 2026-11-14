@@ -194,7 +194,7 @@ fun ClassAnalysisScreen(path: String, onBack: () -> Unit) {
         }
         AlertDialog(
             onDismissRequest = { opened = null },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(current.name.substringAfterLast('.'), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {

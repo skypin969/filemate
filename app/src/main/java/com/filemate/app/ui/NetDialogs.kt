@@ -69,7 +69,7 @@ fun NetServiceDialog(kind: ToolKind, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column {

@@ -44,7 +44,7 @@ data class PreviewTarget(val path: String, val markdown: Boolean)
 @Composable
 fun PreviewScreen(target: PreviewTarget, onBack: () -> Unit, onEdit: () -> Unit) {
     BackHandler { onBack() }
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(Body)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

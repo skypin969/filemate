@@ -2,7 +2,10 @@ package com.filemate.app.ui
 
 import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.filled.Close
@@ -34,7 +37,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Adb
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Article
@@ -80,31 +82,34 @@ private class OpenChoice(
     val mode: OpenMode,
     val label: Int,
     val icon: ImageVector,
+    // Warna kotak ikon, sama dengan warna tiap alat di MT Manager
+    val tile: Color,
 )
 
-// Urutan mengikuti dialog "Buka dengan" di NP Manager. Ikon satu warna, sesuai tema hitam putih.
+// Urutan dan warna mengikuti dialog "Buka dengan" di MT Manager. Setiap alat punya kotak warna sendiri.
 private val CHOICES = listOf(
-    OpenChoice(OpenMode.TEXT, R.string.open_text, Icons.Filled.Description),
-    OpenChoice(OpenMode.ARCHIVE, R.string.open_archive, Icons.Filled.Archive),
-    OpenChoice(OpenMode.IMAGE, R.string.open_image, Icons.Filled.Image),
-    OpenChoice(OpenMode.HEX, R.string.open_hex, Icons.Filled.DataObject),
-    OpenChoice(OpenMode.MUSIC, R.string.open_music, Icons.Filled.MusicNote),
-    OpenChoice(OpenMode.VIDEO, R.string.open_video, Icons.Filled.Movie),
-    OpenChoice(OpenMode.XML, R.string.open_xml, Icons.Filled.Code),
-    OpenChoice(OpenMode.DEX, R.string.open_dex, Icons.Filled.Widgets),
-    OpenChoice(OpenMode.ARSC, R.string.open_arsc, Icons.Filled.GridOn),
-    OpenChoice(OpenMode.APK_INFO, R.string.open_apk_info, Icons.Filled.Android),
-    OpenChoice(OpenMode.APKS, R.string.open_apks, Icons.Filled.Adb),
-    OpenChoice(OpenMode.SCRIPT, R.string.open_script, Icons.Filled.Terminal),
-    OpenChoice(OpenMode.FONT, R.string.open_font, Icons.Filled.TextFields),
-    OpenChoice(OpenMode.SIGNATURE, R.string.open_signature, Icons.Filled.VpnKey),
-    OpenChoice(OpenMode.SVG, R.string.open_svg, Icons.Filled.Photo),
-    OpenChoice(OpenMode.JAR, R.string.open_jar, Icons.Filled.Coffee),
-    OpenChoice(OpenMode.PDF, R.string.open_pdf, Icons.Filled.PictureAsPdf),
-    OpenChoice(OpenMode.CLASS, R.string.open_class, Icons.Filled.Article),
-    OpenChoice(OpenMode.MARKDOWN, R.string.open_markdown, Icons.Filled.Tag),
-    OpenChoice(OpenMode.DATABASE, R.string.open_database, Icons.Filled.Storage),
-    OpenChoice(OpenMode.NINE_PATCH, R.string.open_nine_patch, Icons.Filled.Photo),
+    OpenChoice(OpenMode.TEXT, R.string.open_text, Icons.Filled.Description, Color(0xFF2F4B9C)),
+    OpenChoice(OpenMode.ARCHIVE, R.string.open_archive, Icons.Filled.Archive, Color(0xFF754D3B)),
+    OpenChoice(OpenMode.IMAGE, R.string.open_image, Icons.Filled.Image, Color(0xFF027782)),
+    OpenChoice(OpenMode.HEX, R.string.open_hex, Icons.Filled.DataObject, Color(0xFF456072)),
+    OpenChoice(OpenMode.MUSIC, R.string.open_music, Icons.Filled.MusicNote, Color(0xFFB42225)),
+    OpenChoice(OpenMode.VIDEO, R.string.open_video, Icons.Filled.Movie, Color(0xFFCF6620)),
+    OpenChoice(OpenMode.XML, R.string.open_xml, Icons.Filled.Code, Color(0xFF2F4B9C)),
+    OpenChoice(OpenMode.DEX, R.string.open_dex, Icons.Filled.Widgets, Color(0xFF337274)),
+    OpenChoice(OpenMode.ARSC, R.string.open_arsc, Icons.Filled.Layers, Color(0xFF996106)),
+    OpenChoice(OpenMode.APK_INFO, R.string.open_apk_info, Icons.Filled.Android, Color(0xFF038003)),
+    OpenChoice(OpenMode.APKS, R.string.open_apks, Icons.Filled.Android, Color(0xFF754E3C)),
+    OpenChoice(OpenMode.SCRIPT, R.string.open_script, Icons.Filled.Terminal, Color(0xFF334E9D)),
+    OpenChoice(OpenMode.FONT, R.string.open_font, Icons.Filled.TextFields, Color(0xFF4B4BB6)),
+    OpenChoice(OpenMode.SIGNATURE, R.string.open_signature, Icons.Filled.VpnKey, Color(0xFF456072)),
+    OpenChoice(OpenMode.SVG, R.string.open_svg, Icons.Filled.Photo, Color(0xFF027782)),
+    OpenChoice(OpenMode.NINE_PATCH, R.string.open_nine_patch, Icons.Filled.Photo, Color(0xFF027782)),
+    OpenChoice(OpenMode.JAR, R.string.open_jar, Icons.Filled.Coffee, Color(0xFF754D3B)),
+    OpenChoice(OpenMode.CLASS, R.string.open_class, Icons.Filled.Article, Color(0xFF3C607C)),
+    // Cara buka yang hanya ada di Filemate: tidak dihapus
+    OpenChoice(OpenMode.PDF, R.string.open_pdf, Icons.Filled.PictureAsPdf, Color(0xFF8E2C2C)),
+    OpenChoice(OpenMode.MARKDOWN, R.string.open_markdown, Icons.Filled.Tag, Color(0xFF5A4FA3)),
+    OpenChoice(OpenMode.DATABASE, R.string.open_database, Icons.Filled.Storage, Color(0xFF00695C)),
 )
 
 /** Cara buka bawaan per akhiran berkas, disimpan di pengaturan. Diatur dengan menekan lama ikon di dialog "Buka dengan". */
@@ -180,7 +185,7 @@ fun OpenWithDialog(
     val shown = labeled.filter { query.isBlank() || it.second.contains(query.trim(), ignoreCase = true) }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+        Surface(shape = RoundedCornerShape(20.dp), color = DialogBg) {
             Column(modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 6.dp),
@@ -235,16 +240,24 @@ fun OpenWithDialog(
                                         .padding(vertical = 10.dp, horizontal = 2.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
-                                    Icon(
-                                        imageVector = choice.icon,
-                                        contentDescription = null,
-                                        tint = MenuIcon,
-                                        modifier = Modifier.size(38.dp),
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(choice.tile),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = choice.icon,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(30.dp),
+                                        )
+                                    }
                                     Spacer(Modifier.height(6.dp))
                                     Text(
                                         text = label,
-                                        color = Muted,
+                                        color = Ink,
                                         fontSize = 12.sp,
                                         lineHeight = 14.sp,
                                         textAlign = TextAlign.Center,
@@ -268,8 +281,13 @@ fun OpenWithDialog(
                         DropdownMenu(
                             expanded = typeMenu,
                             onDismissRequest = { typeMenu = false },
-                            containerColor = Color.White,
+                            containerColor = DialogBg,
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.open_builtin), color = Ink, fontSize = 15.sp) },
+                                leadingIcon = { Icon(Icons.Filled.Check, null, tint = Accent) },
+                                onClick = { typeMenu = false },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.open_system), color = Ink, fontSize = 15.sp) },
                                 onClick = {
@@ -305,7 +323,7 @@ fun OpenWithDialog(
     if (helpOpen) {
         AlertDialog(
             onDismissRequest = { helpOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.open_help_title), fontWeight = FontWeight.SemiBold) },
             text = { Text(stringResource(R.string.open_help_body), color = Ink, fontSize = 14.sp) },
             confirmButton = {
@@ -328,7 +346,7 @@ fun OpenWithDialog(
         val defaults = remember(defaultsVersion) { OpenDefaults.all(context) }
         AlertDialog(
             onDismissRequest = { manageOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.open_defaults_title), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {

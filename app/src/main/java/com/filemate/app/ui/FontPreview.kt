@@ -68,7 +68,7 @@ fun FontPreviewScreen(path: String, onBack: () -> Unit) {
 
     BackHandler { onBack() }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(Body)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,7 +173,7 @@ fun FontPreviewScreen(path: String, onBack: () -> Unit) {
     if (infoOpen) {
         AlertDialog(
             onDismissRequest = { infoOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(file.name, fontWeight = FontWeight.SemiBold) },
             text = {
                 Text(

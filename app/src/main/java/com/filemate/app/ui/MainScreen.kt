@@ -80,6 +80,11 @@ import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
@@ -99,6 +104,8 @@ import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
@@ -180,6 +187,7 @@ fun MainScreen(
     // Berkas yang sedang dipilihkan cara bukanya lewat dialog "Buka dengan"
     var openWithTarget by remember { mutableStateOf<FileItem?>(null) }
     val notReady = stringResource(R.string.msg_not_ready)
+    val invalidLocal = stringResource(R.string.local_add_invalid)
     var mcpOpen by remember { mutableStateOf(false) }
     // Dialog "Lompat" yang muncul saat jalur di bilah atas diketuk
     var jumpOpen by remember { mutableStateOf(false) }
@@ -214,6 +222,12 @@ fun MainScreen(
     // Daftar APK/DEX di folder ini untuk dipilih alat "Analisis kelas"
     var classPickOpen by remember { mutableStateOf(false) }
     val noApkHere = stringResource(R.string.dex_no_file)
+    // Pengaturan menu samping: penyimpanan lokal tambahan, urutan dan alat yang disembunyikan,
+    // serta dialog yang sedang terbuka dari menu samping
+    var localPaths by remember { mutableStateOf(AppPrefs.localStorages(context)) }
+    var toolOrderSaved by remember { mutableStateOf(AppPrefs.toolOrderText(context)) }
+    var toolHiddenSaved by remember { mutableStateOf(AppPrefs.toolHiddenKeys(context)) }
+    var drawerDialog by remember { mutableStateOf<DrawerDialog?>(null) }
     val jarWorking = stringResource(R.string.jar_working)
     val jarDone = stringResource(R.string.jar_done)
     val jarFailed = stringResource(R.string.jar_failed)
@@ -421,6 +435,19 @@ fun MainScreen(
         drawerContent = {
             DrawerSheet(
                 bookmarks = state.bookmarks,
+                localPaths = localPaths,
+                toolOrder = drawerToolOrder(toolOrderSaved),
+                toolHidden = toolHiddenSaved,
+                onRemoveLocal = { path ->
+                    val updated = localPaths - path
+                    AppPrefs.saveLocalStorages(context, updated)
+                    localPaths = updated
+                },
+                // Dialog dari menu samping dibuka setelah menu samping ditutup
+                onDialog = { dialog ->
+                    scope.launch { drawerState.close() }
+                    drawerDialog = dialog
+                },
                 onGoto = { path ->
                     scope.launch { drawerState.close() }
                     vm.openFolder(state.active, path)
@@ -478,7 +505,7 @@ fun MainScreen(
             )
         },
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Box(modifier = Modifier.fillMaxSize().background(Body)) {
             Column(modifier = Modifier.fillMaxSize()) {
                 TopBar(
                     path = active.path,
@@ -513,13 +540,13 @@ fun MainScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxSize()
-                                .background(if (state.active == 0) Muted else Color.White),
+                                .background(if (state.active == 0) Muted else Body),
                         )
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxSize()
-                                .background(if (state.active == 1) Muted else Color.White),
+                                .background(if (state.active == 1) Muted else Body),
                         )
                     }
                 }
@@ -688,6 +715,8 @@ fun MainScreen(
                 closeMenu { vm.addBookmark(if (item.isDir) item.path else FileRepository.parentOf(item.path)) }
             },
             onExtract = { closeMenu { vm.setActive(index); vm.showDialog(AppDialog.Extract(item.path)) } },
+            // Tanda tangani membuka dialog APK lalu langsung menandatanganinya
+            onSign = { closeMenu { vm.openApk(item.path); vm.signApk() } },
             onRunScript = {
                 closeMenu {
                     onOpenTerminal(
@@ -746,6 +775,64 @@ fun MainScreen(
         )
     }
 
+    // Dialog dari menu samping: Manajemen Jarak Jauh, Manajer Plugin, Kelola grup alat, dan lainnya
+    val toolLabels = DRAWER_TOOL_LABELS.map { it.first to stringResource(it.second) }.toMap()
+    when (drawerDialog) {
+        null -> Unit
+        DrawerDialog.REMOTE -> RemoteHubDialog(
+            onPick = { kind ->
+                drawerDialog = null
+                netDialog = kind
+            },
+            onDismiss = { drawerDialog = null },
+        )
+        DrawerDialog.PLUGINS -> PluginManagerDialog(onDismiss = { drawerDialog = null })
+        DrawerDialog.TOOL_GROUP -> ToolGroupDialog(
+            items = drawerToolOrder(toolOrderSaved).map { key -> key to (toolLabels[key] ?: key) },
+            hidden = toolHiddenSaved,
+            onSave = { order, hidden ->
+                AppPrefs.saveToolLayout(context, order, hidden)
+                toolOrderSaved = order.joinToString(",")
+                toolHiddenSaved = hidden
+                drawerDialog = null
+            },
+            onReset = {
+                AppPrefs.saveToolLayout(context, emptyList(), emptySet())
+                toolOrderSaved = ""
+                toolHiddenSaved = emptySet()
+                drawerDialog = null
+            },
+            onDismiss = { drawerDialog = null },
+        )
+        DrawerDialog.ADD_LOCAL -> InputDialog(
+            title = stringResource(R.string.menu_add_local_storage),
+            label = stringResource(R.string.local_add_hint),
+            initial = "",
+            confirmText = stringResource(R.string.btn_ok),
+            onConfirm = { typed ->
+                drawerDialog = null
+                val folder = File(typed)
+                if (folder.isDirectory && folder.canRead()) {
+                    val updated = (localPaths + typed).distinct()
+                    AppPrefs.saveLocalStorages(context, updated)
+                    localPaths = updated
+                } else {
+                    vm.notify(invalidLocal)
+                }
+            },
+            onDismiss = { drawerDialog = null },
+        )
+        DrawerDialog.FOLLOW_INFO -> FollowSystemDialog(
+            onConfirm = {
+                ThemeMode.followSystem = false
+                ThemeMode.manualDark = !ThemeMode.dark
+                AppPrefs.saveTheme(context)
+                drawerDialog = null
+            },
+            onDismiss = { drawerDialog = null },
+        )
+    }
+
     netDialog?.let { kind ->
         NetServiceDialog(kind = kind, onDismiss = { netDialog = null })
     }
@@ -782,7 +869,7 @@ fun MainScreen(
         val candidates = active.items.filter { it.isApk || it.extension == "DEX" }
         AlertDialog(
             onDismissRequest = { classPickOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.tool_class_analysis), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -813,7 +900,7 @@ fun MainScreen(
     installAsk?.let { warnings ->
         AlertDialog(
             onDismissRequest = { installAsk = null },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.apk_btn_install), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
@@ -1086,7 +1173,7 @@ private fun TopBar(
             DropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false },
-                containerColor = Color.White,
+                containerColor = DialogBg,
             ) {
                 // Urutan mengikuti menu titik tiga MT Manager
                 OverflowItem(stringResource(R.string.bar_refresh), Icons.Filled.Refresh) {
@@ -1345,7 +1432,7 @@ private fun BarFrame(extraBottom: Int, buttons: @Composable RowScope.() -> Unit)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(Body)
             .navigationBarsPadding(),
     ) {
         HorizontalDivider(color = LineColor)
@@ -1413,10 +1500,12 @@ private fun ItemMenu(
     onEditText: () -> Unit,
     onBookmark: () -> Unit,
     onExtract: () -> Unit,
+    onSign: () -> Unit,
     onRunScript: () -> Unit,
 ) {
     val isFile = !item.isDir
     val isZip = isFile && item.extension == "ZIP"
+    val isApk = isFile && item.isApk
     val copyText = stringResource(R.string.btn_copy)
     val moveText = stringResource(R.string.btn_move)
     // Tanda panah menunjukkan arah panel tujuan
@@ -1449,8 +1538,9 @@ private fun ItemMenu(
             "tools" to MenuEntry(stringResource(R.string.menu_tools), Icons.Filled.Build, Ink, onTools),
             "edittext" to if (isFile) MenuEntry(stringResource(R.string.menu_edit_text), Icons.Filled.Description, Ink, onEditText) else null,
             "bookmark" to MenuEntry(stringResource(R.string.menu_bookmark), Icons.Filled.Bookmark, Ink, onBookmark),
-            // Untuk ZIP pilihannya mengekstrak, untuk berkas lain menjalankan skrip
-            "extra" to if (isZip) {
+            // APK hanya bisa ditandatangani. ZIP dan APK bisa diekstrak, berkas lain menjalankan skrip
+            "sign" to if (isApk) MenuEntry(stringResource(R.string.menu_sign), Icons.Filled.VpnKey, Ink, onSign) else null,
+            "extra" to if (isZip || isApk) {
                 MenuEntry(stringResource(R.string.menu_extract), Icons.Filled.Unarchive, Ink, onExtract)
             } else if (isFile) {
                 MenuEntry(stringResource(R.string.menu_run_script), Icons.Filled.Terminal, Ink, onRunScript)
@@ -1464,7 +1554,7 @@ private fun ItemMenu(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = Color.White,
+            color = DialogBg,
         ) {
             Column(
                 modifier = Modifier
@@ -1518,7 +1608,7 @@ private fun AttributesDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.dialog_attributes_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column {
@@ -1566,7 +1656,7 @@ private fun SortDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.menu_sort), fontWeight = FontWeight.SemiBold) },
         text = {
             Column {
@@ -1607,7 +1697,7 @@ private fun TypeFilterDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.dialog_filter_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column {
@@ -1643,18 +1733,23 @@ private fun filterLabelRes(filter: TypeFilter): Int = when (filter) {
 }
 
 /** Satu alat di menu samping. [action] null berarti fiturnya belum dibuat. */
-private class DrawerTool(val label: Int, val icon: ImageVector, val action: (() -> Unit)?)
+private class DrawerTool(val key: String, val label: Int, val icon: ImageVector, val action: (() -> Unit)?)
 
 /**
- * Menu samping, susunannya mengikuti NP Manager: kepala biru, lalu bagian Lokal,
- * Bookmark, Alat, dan Kontak yang masing-masing bisa dilipat.
+ * Menu samping seperti MT Manager: kepala berwarna tema dengan tombol tema dan menu tambahan,
+ * lalu bagian Lokal, Bookmark, Peralatan, dan Kontak yang masing-masing bisa dilipat.
  */
 @Composable
 private fun DrawerSheet(
     bookmarks: List<String>,
+    localPaths: List<String>,
+    toolOrder: List<String>,
+    toolHidden: Set<String>,
     onGoto: (String) -> Unit,
     onRootDir: () -> Unit,
     onRemoveBookmark: (String) -> Unit,
+    onRemoveLocal: (String) -> Unit,
+    onDialog: (DrawerDialog) -> Unit,
     onSettings: () -> Unit,
     onApps: () -> Unit,
     onTerminal: () -> Unit,
@@ -1667,50 +1762,83 @@ private fun DrawerSheet(
     val storageLabel = stringResource(R.string.title_storage)
     val context = LocalContext.current
     val volumes by Volumes.list.collectAsState()
+    val version = remember { appVersionName(context) }
     var localOpen by remember { mutableStateOf(true) }
     var bookmarkOpen by remember { mutableStateOf(false) }
     var toolsOpen by remember { mutableStateOf(true) }
     var otherOpen by remember { mutableStateOf(true) }
+    var menuOpen by remember { mutableStateOf(false) }
+    // Dibaca di sini supaya ikon tema dan centang ikut berubah saat mode diganti
+    val darkNow = ThemeMode.dark
+    val followNow = ThemeMode.followSystem
 
-    // Urutan mengikuti NP Manager. Yang belum dibuat menampilkan pesan saat diketuk.
-    val tools = listOf(
-        DrawerTool(R.string.tool_apps, Icons.Filled.Layers, onApps),
-        DrawerTool(R.string.tool_toolbox, Icons.Filled.Build, { onTool(ToolKind.TOOLBOX) }),
-        DrawerTool(R.string.tool_apk_mcp, Icons.Filled.SmartToy, onMcp),
-        DrawerTool(R.string.tool_ftp, Icons.Filled.Cloud, { onTool(ToolKind.FTP) }),
-        DrawerTool(R.string.tool_http, Icons.Filled.Language, { onTool(ToolKind.HTTP) }),
-        DrawerTool(R.string.tool_lan, Icons.Filled.Wifi, { onTool(ToolKind.LAN) }),
-        DrawerTool(R.string.tool_recycle, Icons.Filled.Delete, onTrash),
-        DrawerTool(R.string.tool_keys, Icons.Filled.VpnKey, { onTool(ToolKind.KEYS) }),
-        DrawerTool(R.string.tool_passwords, Icons.Filled.Lock, { onTool(ToolKind.PASSWORDS) }),
-        DrawerTool(R.string.tool_java2smali, Icons.Filled.Coffee, null),
-        DrawerTool(R.string.tool_smali_query, Icons.Filled.Description, { onTool(ToolKind.SMALI) }),
-        DrawerTool(R.string.tool_network, Icons.Filled.Public, { onTool(ToolKind.NETWORK) }),
-        DrawerTool(R.string.tool_terminal, Icons.Filled.Terminal, onTerminal),
-        DrawerTool(R.string.tool_activity_record, Icons.Filled.TrackChanges, { onTool(ToolKind.ACTIVITY) }),
-        DrawerTool(R.string.tool_layout_viewer, Icons.Filled.ViewQuilt, { onTool(ToolKind.LAYOUT) }),
-        DrawerTool(R.string.tool_color_picker, Icons.Filled.Colorize, { onTool(ToolKind.COLOR) }),
-        DrawerTool(R.string.tool_ruler, Icons.Filled.Straighten, { onTool(ToolKind.RULER) }),
-        DrawerTool(R.string.tool_decibel, Icons.Filled.GraphicEq, { onTool(ToolKind.DECIBEL) }),
-        DrawerTool(R.string.tool_text_editor, Icons.Filled.EditNote, onNewText),
-        DrawerTool(R.string.tool_reflection, Icons.Filled.Code, null),
-        DrawerTool(R.string.tool_class_analysis, Icons.Filled.Handyman, { onTool(ToolKind.CLASSES) }),
-        DrawerTool(R.string.tool_timestamp, Icons.Filled.Schedule, { onTool(ToolKind.TIMESTAMP) }),
-    )
+    // Ikon matahari atau bulan. Jika "Tema mengikuti sistem" aktif, user ditanya dulu.
+    fun toggleDark() {
+        if (ThemeMode.followSystem) {
+            onDialog(DrawerDialog.FOLLOW_INFO)
+        } else {
+            ThemeMode.manualDark = !ThemeMode.manualDark
+            AppPrefs.saveTheme(context)
+        }
+    }
+
+    // Centang "Tema mengikuti sistem". Saat dimatikan, mode yang sedang tampil tetap dipakai.
+    fun toggleFollow() {
+        if (ThemeMode.followSystem) {
+            ThemeMode.manualDark = ThemeMode.dark
+            ThemeMode.followSystem = false
+        } else {
+            ThemeMode.followSystem = true
+        }
+        AppPrefs.saveTheme(context)
+    }
+
+    // Alat MT Manager dulu (Tempat sampah sampai Instruksi Smali), lalu alat khusus Filemate.
+    // Yang belum dibuat menampilkan pesan saat diketuk.
+    val allTools: Map<String, DrawerTool> = listOf(
+        DrawerTool("trash", R.string.drawer_trash, Icons.Filled.Delete, onTrash),
+        DrawerTool("plugins", R.string.drawer_plugins, Icons.Filled.Extension, { onDialog(DrawerDialog.PLUGINS) }),
+        DrawerTool("remote", R.string.drawer_remote, Icons.Filled.Dns, { onDialog(DrawerDialog.REMOTE) }),
+        DrawerTool("color", R.string.drawer_color, Icons.Filled.Colorize, { onTool(ToolKind.COLOR) }),
+        DrawerTool("keys", R.string.drawer_keys, Icons.Filled.VpnKey, { onTool(ToolKind.KEYS) }),
+        DrawerTool("passwords", R.string.drawer_passwords, Icons.Filled.Lock, { onTool(ToolKind.PASSWORDS) }),
+        DrawerTool("extract_apk", R.string.drawer_extract_apk, Icons.Filled.Archive, onApps),
+        DrawerTool("text", R.string.drawer_text, Icons.Filled.EditNote, onNewText),
+        DrawerTool("terminal", R.string.drawer_terminal, Icons.Filled.Terminal, onTerminal),
+        DrawerTool("activity", R.string.drawer_activity, Icons.Filled.TrackChanges, { onTool(ToolKind.ACTIVITY) }),
+        DrawerTool("smali", R.string.drawer_smali, Icons.Filled.Description, { onTool(ToolKind.SMALI) }),
+        DrawerTool("apps", R.string.tool_apps, Icons.Filled.Layers, onApps),
+        DrawerTool("toolbox", R.string.tool_toolbox, Icons.Filled.Build, { onTool(ToolKind.TOOLBOX) }),
+        DrawerTool("mcp", R.string.tool_apk_mcp, Icons.Filled.SmartToy, onMcp),
+        DrawerTool("ftp", R.string.tool_ftp, Icons.Filled.Cloud, { onTool(ToolKind.FTP) }),
+        DrawerTool("http", R.string.tool_http, Icons.Filled.Language, { onTool(ToolKind.HTTP) }),
+        DrawerTool("lan", R.string.tool_lan, Icons.Filled.Wifi, { onTool(ToolKind.LAN) }),
+        DrawerTool("java2smali", R.string.tool_java2smali, Icons.Filled.Coffee, null),
+        DrawerTool("network", R.string.tool_network, Icons.Filled.Public, { onTool(ToolKind.NETWORK) }),
+        DrawerTool("layout", R.string.tool_layout_viewer, Icons.Filled.ViewQuilt, { onTool(ToolKind.LAYOUT) }),
+        DrawerTool("ruler", R.string.tool_ruler, Icons.Filled.Straighten, { onTool(ToolKind.RULER) }),
+        DrawerTool("decibel", R.string.tool_decibel, Icons.Filled.GraphicEq, { onTool(ToolKind.DECIBEL) }),
+        DrawerTool("reflection", R.string.tool_reflection, Icons.Filled.Code, null),
+        DrawerTool("classes", R.string.tool_class_analysis, Icons.Filled.Handyman, { onTool(ToolKind.CLASSES) }),
+        DrawerTool("timestamp", R.string.tool_timestamp, Icons.Filled.Schedule, { onTool(ToolKind.TIMESTAMP) }),
+        DrawerTool("prefs", R.string.drawer_settings, Icons.Filled.Settings, onSettings),
+    ).associateBy { it.key }
+    // Alat yang tampil: urutan dari Kelola grup alat, tanpa yang disembunyikan
+    val tools = toolOrder.mapNotNull { allTools[it] }.filter { it.key !in toolHidden }
 
     ModalDrawerSheet(
         drawerShape = RectangleShape,
-        drawerContainerColor = Color.White,
+        drawerContainerColor = Body,
         windowInsets = WindowInsets(0, 0, 0, 0),
         modifier = Modifier.width(300.dp),
     ) {
-        // Kepala menu: logo dan nama aplikasi
+        // Kepala menu: logo, nama aplikasi dan versi, tombol tema, dan menu tambahan
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Accent)
+                .background(Primary)
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+                .padding(start = 18.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
@@ -1722,12 +1850,86 @@ private fun DrawerSheet(
                     .clip(RoundedCornerShape(12.dp)),
             )
             Spacer(Modifier.width(14.dp))
-            Text(
-                text = stringResource(R.string.app_name),
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(R.string.drawer_version, version),
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                )
+            }
+            IconButton(onClick = { toggleDark() }) {
+                Icon(
+                    imageVector = if (darkNow) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                    contentDescription = stringResource(R.string.drawer_theme_toggle),
+                    tint = Color.White,
+                )
+            }
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.cd_more),
+                        tint = Color.White,
+                    )
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_follow_system), color = Ink) },
+                        leadingIcon = {
+                            Checkbox(
+                                checked = followNow,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Accent),
+                            )
+                        },
+                        onClick = {
+                            menuOpen = false
+                            toggleFollow()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_add_net_storage), color = Ink) },
+                        onClick = {
+                            menuOpen = false
+                            onNotReady()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_add_local_storage), color = Ink) },
+                        onClick = {
+                            menuOpen = false
+                            onDialog(DrawerDialog.ADD_LOCAL)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_add_net_group), color = Ink) },
+                        onClick = {
+                            menuOpen = false
+                            onNotReady()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_manage_tools), color = Ink) },
+                        onClick = {
+                            menuOpen = false
+                            onDialog(DrawerDialog.TOOL_GROUP)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.drawer_settings), color = Ink) },
+                        onClick = {
+                            menuOpen = false
+                            onSettings()
+                        },
+                    )
+                }
+            }
         }
 
         Column(
@@ -1738,7 +1940,7 @@ private fun DrawerSheet(
         ) {
             DrawerSection(stringResource(R.string.drawer_section_local), localOpen) { localOpen = !localOpen }
             if (localOpen) {
-                // Akses root aktif otomatis. Jika belum, mengetuk Direktori root mencobanya lagi.
+                // Akses root aktif otomatis. Jika belum, mengetuk Direktori Akar mencobanya lagi.
                 StorageRow(
                     title = stringResource(R.string.drawer_root_dir),
                     icon = Icons.Filled.PhoneAndroid,
@@ -1746,7 +1948,7 @@ private fun DrawerSheet(
                     onClick = onRootDir,
                 )
                 StorageRow(
-                    title = storageLabel,
+                    title = stringResource(R.string.drawer_storage_dir),
                     icon = Icons.Filled.SdStorage,
                     path = FileRepository.STORAGE_ROOT,
                     onClick = { onGoto(FileRepository.STORAGE_ROOT) },
@@ -1758,6 +1960,16 @@ private fun DrawerSheet(
                         icon = Icons.Filled.Usb,
                         path = volume.path,
                         onClick = { onGoto(volume.path) },
+                    )
+                }
+                // Penyimpanan lokal tambahan dari menu ⋮. Folder yang sudah tidak ada tidak ditampilkan.
+                localPaths.filter { File(it).isDirectory }.forEach { path ->
+                    StorageRow(
+                        title = path.substringAfterLast('/').ifEmpty { path },
+                        icon = Icons.Filled.Folder,
+                        path = path,
+                        onClick = { onGoto(path) },
+                        onRemove = { onRemoveLocal(path) },
                     )
                 }
             }
@@ -1815,7 +2027,6 @@ private fun DrawerSheet(
                 tools.forEach { tool ->
                     DrawerRow(stringResource(tool.label), tool.icon, tool.action ?: onNotReady)
                 }
-                DrawerRow(stringResource(R.string.drawer_settings), Icons.Filled.Settings, onSettings)
             }
 
             DrawerSection(stringResource(R.string.drawer_section_contact), otherOpen) { otherOpen = !otherOpen }
@@ -1942,13 +2153,17 @@ private fun DrawerIcon(icon: ImageVector) {
     }
 }
 
-/** Baris penyimpanan: nama, batang pemakaian dengan persen, dan keterangan terpakai/tersedia. */
+/**
+ * Baris penyimpanan: nama, batang pemakaian dengan persen, dan keterangan terpakai/tersedia.
+ * [onRemove] dipakai untuk penyimpanan lokal tambahan dan menampilkan tombol hapus di kanan.
+ */
 @Composable
 private fun StorageRow(
     title: String,
     icon: ImageVector,
     path: String,
     onClick: () -> Unit,
+    onRemove: (() -> Unit)? = null,
 ) {
     val (total, free) = remember(path) { storageBytes(path) }
     // Flashdisk yang hanya terbaca lewat root tidak bisa diukur dari sini, jadi cukup tampilkan jalurnya
@@ -1966,6 +2181,7 @@ private fun StorageRow(
                 Text(text = title, color = Ink, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(text = path, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            RemoveButton(onRemove)
         }
         return
     }
@@ -2004,6 +2220,21 @@ private fun StorageRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        RemoveButton(onRemove)
+    }
+}
+
+/** Tombol hapus kecil untuk penyimpanan lokal tambahan. Tidak tampil jika [onRemove] kosong. */
+@Composable
+private fun RemoveButton(onRemove: (() -> Unit)?) {
+    if (onRemove == null) return
+    IconButton(onClick = onRemove) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = stringResource(R.string.cd_remove_local),
+            tint = Muted,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

@@ -102,7 +102,7 @@ fun ToolScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BackHandler { onBack() }
-    Column(modifier = Modifier.fillMaxSize().background(Color.White).imePadding()) {
+    Column(modifier = Modifier.fillMaxSize().background(Body).imePadding()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -417,7 +417,7 @@ fun RulerScreen(onBack: () -> Unit) {
                     mm % 5 == 0 -> 46f
                     else -> 28f
                 }
-                drawLine(Color.Black, Offset(0f, y), Offset(length, y), strokeWidth = 2f)
+                drawLine(Ink, Offset(0f, y), Offset(length, y), strokeWidth = 2f)
                 if (mm % 10 == 0 && mm > 0) {
                     drawContext.canvas.nativeCanvas.drawText((mm / 10).toString(), 80f, y + 10f, paint)
                 }

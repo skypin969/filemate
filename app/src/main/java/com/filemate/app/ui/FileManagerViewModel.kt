@@ -155,7 +155,8 @@ class FileManagerViewModel(app: Application) : AndroidViewModel(app) {
         reloadAll()
         // Akses root dicoba otomatis setiap aplikasi dibuka. Jika izin sudah diberikan di aplikasi
         // pengelola root (Magisk, KernelSU), mode root langsung aktif tanpa tombol.
-        setRootMode(true, quiet = true)
+        // Preferensi "Meminta izin akses Root": bila dimatikan, akses root tidak diminta saat dibuka
+        if (prefs.getBoolean(AppPrefs.KEY_ASK_ROOT, true)) setRootMode(true, quiet = true)
         watchVolumes(app)
         // Pengaturan "Membersihkan Recycle Bin secara otomatis"
         val trashDays = prefs.getInt(AppPrefs.KEY_TRASH_DAYS, 0)

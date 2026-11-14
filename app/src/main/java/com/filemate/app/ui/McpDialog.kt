@@ -108,7 +108,7 @@ fun McpDialog(onDismiss: () -> Unit) {
     }
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
+        Surface(shape = RoundedCornerShape(24.dp), color = DialogBg) {
             Column(modifier = Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -211,7 +211,7 @@ fun McpDialog(onDismiss: () -> Unit) {
         val valid = port != null && port in 1024..65535
         AlertDialog(
             onDismissRequest = { showSettings = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.mcp_settings), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
@@ -256,7 +256,7 @@ fun McpDialog(onDismiss: () -> Unit) {
     if (showHistory) {
         AlertDialog(
             onDismissRequest = { showHistory = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.mcp_history), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
@@ -332,7 +332,7 @@ private fun McpHelpDialog(onDismiss: () -> Unit) {
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.mcp_help), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {

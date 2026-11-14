@@ -107,7 +107,7 @@ fun NewItemDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.dialog_new_title), fontWeight = FontWeight.SemiBold) },
         text = {
             TextField(
@@ -193,7 +193,7 @@ fun ConfirmDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column {

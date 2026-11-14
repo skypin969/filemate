@@ -236,7 +236,7 @@ fun AppManagerScreen(onBack: () -> Unit) {
         }
 
         // Dua tab dengan garis bawah pada tab yang aktif
-        Row(modifier = Modifier.fillMaxWidth().background(Color.White)) {
+        Row(modifier = Modifier.fillMaxWidth().background(Body)) {
             AppTab(
                 text = stringResource(R.string.apps_tab_user, userCount),
                 selected = !systemTab,
@@ -358,7 +358,7 @@ private fun AppDetailDialog(app: AppRow, onMore: () -> Unit, onExtract: () -> Un
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = {
             Column {
                 Text(app.label, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -423,7 +423,7 @@ private fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .padding(horizontal = 4.dp)
             .clip(RoundedCornerShape(50))
-            .background(if (selected) Accent else Color.White)
+            .background(if (selected) Accent else DialogBg)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     )
@@ -452,7 +452,7 @@ private fun AppCard(app: AppRow, onOpen: () -> Unit, onExtract: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White)
+            .background(DialogBg)
             .clickable(onClick = onOpen)
             .padding(start = 12.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

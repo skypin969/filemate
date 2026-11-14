@@ -66,7 +66,7 @@ fun PermissionScreen(onGranted: () -> Unit) {
             // Biru hanya di belakang bilah status, supaya ikon putihnya tetap terlihat
             .background(Primary)
             .statusBarsPadding()
-            .background(Color.White)
+            .background(Body)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 32.dp),
     ) {

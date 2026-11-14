@@ -144,7 +144,7 @@ fun AttributesDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.dialog_attributes_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -346,7 +346,7 @@ private fun PermissionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.attr_permission), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -491,7 +491,7 @@ private fun OwnerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {

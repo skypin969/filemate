@@ -92,7 +92,7 @@ fun FileToolsDialog(
     // "Alat APK" hanya ditampilkan untuk berkas APK, supaya daftarnya sama seperti MT Manager untuk berkas lain
     val tools = FileTool.entries.filter { it != FileTool.APK || toolEnabled(it, targets) }
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+        Surface(shape = RoundedCornerShape(20.dp), color = DialogBg) {
             Column(modifier = Modifier.padding(top = 18.dp, bottom = 10.dp)) {
                 Text(
                     text = stringResource(R.string.menu_tools_title),
@@ -154,7 +154,7 @@ fun ExtractDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.extract_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column {

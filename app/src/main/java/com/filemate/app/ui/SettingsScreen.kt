@@ -1,5 +1,8 @@
 package com.filemate.app.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import com.filemate.app.apk.Jar2Dex
 import com.filemate.app.data.FileRepository
@@ -76,6 +79,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var home by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_HOME, "").orEmpty()) }
     var showAbout by remember { mutableStateOf(false) }
     var theme by remember { mutableStateOf(ThemeColors.primary) }
+    var launcherLight by remember { mutableStateOf(prefs.getBoolean(AppPrefs.KEY_LAUNCHER_LIGHT, false)) }
     var suCommand by remember { mutableStateOf(prefs.getString(AppPrefs.KEY_SU, "su").orEmpty().ifBlank { "su" }) }
     var workDir by remember { mutableStateOf(FileRepository.FILEMATE_DIR) }
     var thumbMb by remember { mutableStateOf(prefs.getInt(AppPrefs.KEY_THUMB_MAX_MB, 10)) }
@@ -144,10 +148,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .navigationBarsPadding(),
         ) {
             SectionTitle(stringResource(R.string.settings_start_header))
+            Toggle(AppPrefs.KEY_ASK_ROOT, true, R.string.settings_ask_root_title, R.string.settings_ask_root_desc)
+            Toggle(AppPrefs.KEY_ASK_SHELL, true, R.string.settings_ask_shell_title, R.string.settings_ask_shell_desc)
             SettingRow(
                 title = stringResource(R.string.settings_su_title),
                 subtitle = suCommand,
                 onClick = { input = "su" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_shizuku_title),
+                subtitle = stringResource(R.string.settings_shizuku_desc),
+                onClick = { openUrl(context, "https://shizuku.rikka.app/") },
             )
             SettingRow(
                 title = stringResource(R.string.settings_home_title),
@@ -178,6 +189,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 title = stringResource(R.string.settings_theme_title),
                 subtitle = stringResource(R.string.settings_theme_desc),
                 onClick = { choice = "theme" },
+            )
+            SettingRow(
+                title = stringResource(R.string.settings_launcher_title),
+                subtitle = stringResource(
+                    if (launcherLight) R.string.settings_launcher_light else R.string.settings_launcher_dark,
+                ),
+                onClick = { choice = "launcher" },
             )
             SettingRow(
                 title = stringResource(R.string.settings_lang_header),
@@ -311,7 +329,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     if (showLanguage) {
         AlertDialog(
             onDismissRequest = { showLanguage = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.settings_lang_header), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
@@ -392,6 +410,22 @@ fun SettingsScreen(onBack: () -> Unit) {
                 theme = it
                 ThemeColors.primary = it
                 prefs.edit().putInt(AppPrefs.KEY_THEME, it).apply()
+                choice = null
+            },
+            onDismiss = { choice = null },
+        )
+
+        "launcher" -> ChoiceDialog(
+            title = stringResource(R.string.settings_launcher_title),
+            options = listOf(
+                stringResource(R.string.settings_launcher_light) to 1,
+                stringResource(R.string.settings_launcher_dark) to 0,
+            ),
+            current = if (launcherLight) 1 else 0,
+            onPick = { value ->
+                launcherLight = value == 1
+                prefs.edit().putBoolean(AppPrefs.KEY_LAUNCHER_LIGHT, launcherLight).apply()
+                AppPrefs.applyLauncherIcon(context, launcherLight)
                 choice = null
             },
             onDismiss = { choice = null },
@@ -558,7 +592,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     if (showAbout) {
         AlertDialog(
             onDismissRequest = { showAbout = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.about_title), fontWeight = FontWeight.SemiBold) },
             text = { Text(stringResource(R.string.about_body)) },
             confirmButton = {
@@ -580,7 +614,7 @@ private fun ThemeDialog(
     var selected by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(stringResource(R.string.settings_theme_title), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -620,6 +654,15 @@ private fun ThemeDialog(
     )
 }
 
+/** Membuka tautan di peramban. Jika tidak ada aplikasi yang bisa membukanya, muncul pesan. */
+private fun openUrl(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        Toast.makeText(context, R.string.contact_open_failed, Toast.LENGTH_SHORT).show()
+    }
+}
+
 /** Dialog pilihan bulat (radio), dipakai untuk ukuran daftar, jumlah baris nama, dan margin bawah. */
 @Composable
 private fun ChoiceDialog(
@@ -631,7 +674,7 @@ private fun ChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -729,7 +772,7 @@ private fun StartPathDialog(
     var value by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = DialogBg,
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
         text = {
             Column {

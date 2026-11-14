@@ -578,7 +578,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White).imePadding()) {
+    Column(modifier = Modifier.fillMaxSize().background(Body).imePadding()) {
         // Bilah atas seperti MT Manager: daftar berkas, urung, ulang, simpan, pensil, dan menu titik tiga
         Column(modifier = Modifier.fillMaxWidth().background(HeaderBrush).statusBarsPadding()) {
             Row(
@@ -630,7 +630,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
                     DropdownMenu(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        containerColor = Color.White,
+                        containerColor = DialogBg,
                     ) {
                         EditorMenuItem(stringResource(R.string.editor_menu_file), Icons.Filled.InsertDriveFile, arrow = true) {
                             menuOpen = false
@@ -692,7 +692,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
                     DropdownMenu(
                         expanded = fileMenuOpen,
                         onDismissRequest = { fileMenuOpen = false },
-                        containerColor = Color.White,
+                        containerColor = DialogBg,
                     ) {
                         EditorMenuItem(stringResource(R.string.btn_save), Icons.Filled.Save, enabled = ready) {
                             fileMenuOpen = false
@@ -923,7 +923,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
     if (syntaxOpen) {
         AlertDialog(
             onDismissRequest = { syntaxOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.editor_syntax), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
@@ -966,7 +966,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
     if (prefsOpen) {
         AlertDialog(
             onDismissRequest = { prefsOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.editor_prefs), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
@@ -1010,7 +1010,7 @@ private fun TextEditor(doc: EditorDoc, onExit: () -> Unit) {
     if (listOpen) {
         AlertDialog(
             onDismissRequest = { listOpen = false },
-            containerColor = Color.White,
+            containerColor = DialogBg,
             title = { Text(stringResource(R.string.tool_text_editor), fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -1231,7 +1231,7 @@ private fun HexEditor(target: EditorTarget, onBack: () -> Unit) {
     val rows = (shown.size + ROW_SIZE - 1) / ROW_SIZE
     val err = error
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(modifier = Modifier.fillMaxSize().background(Body)) {
         EditorTopBar(
             title = FileRepository.nameOf(target.path),
             info = stringResource(R.string.editor_hex_label),
